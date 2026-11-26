@@ -18,6 +18,7 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public static DateTimeOffset Now { get; } = new(2027, 1, 15, 8, 0, 0, TimeSpan.Zero);
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
+    public TestAccountEmail Mail { get; } = new();
     public HttpClient Client { get; private set; } = null!;
 
     public async Task InitializeAsync()
@@ -28,7 +29,16 @@ public sealed class ApiFixture : IAsyncLifetime
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
                 new Dictionary<string, string?> { ["ConnectionStrings:TimeNest"] = database.GetConnectionString() }));
-            builder.ConfigureServices(services => services.AddSingleton<TimeProvider>(new FixedClock()));
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<TimeProvider>(new FixedClock());
+                services.AddSingleton<TimeNest.Api.Features.Accounts.IAccountEmail>(Mail);
+                // Freeze discovery time, but keep cookie issuance and stamp validation on the same live clock.
+                services.PostConfigureAll<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(
+                    options => options.TimeProvider = TimeProvider.System);
+                services.PostConfigure<Microsoft.AspNetCore.Identity.SecurityStampValidatorOptions>(
+                    options => options.TimeProvider = TimeProvider.System);
+            });
         });
         Client = Factory.CreateClient();
         await using var scope = Factory.Services.CreateAsyncScope();

@@ -437,3 +437,4 @@ output/
 .env.*
 !.env.example
 api/TimeNest.Api/wwwroot/
+.local/

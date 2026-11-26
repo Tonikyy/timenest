@@ -33,7 +33,7 @@ Demo appointments start tomorrow in Europe/Helsinki and span four days. Re-runni
 
 Search parameters: latitude, longitude, radiusKm (1–100), serviceTypeId, from (inclusive), to (exclusive), page (1–10000), pageSize (1–50). Defaults: Helsinki center, 10 km, first page, 12 results. Send ISO timestamps with an explicit offset. Date input displayed in Finland must be converted using Europe/Helsinki rather than the visitor's machine timezone.
 
-Search is read-only. There are no account, publishing, booking, or payment endpoints yet. The API never returns fallback demo data if SQL Server is unavailable.
+Search is read-only. Account endpoints are described below; publishing, booking and payment endpoints are not included in the accounts slice. The API never returns fallback demo data if SQL Server is unavailable.
 
 ## Build and test
 
@@ -62,3 +62,11 @@ docker compose stop
 ```
 
 This preserves the named data volume. Do not delete it to troubleshoot an unrelated application problem.
+
+## Accounts
+
+Run the setup script again after pulling the accounts PR to apply the Identity migration. Open /account/register, use a fictional email and a 12–128 character password, then open the confirmation link in the newest JSON message under api/TimeNest.Api/.local/mail. This mailbox is local, ignored by Git and never served over HTTP. Treat its links as credentials and do not share or commit it. Forgotten-password and resend-confirmation flows use the same mailbox.
+
+The API provides GET /api/account/me and /api/account/csrf, plus POST register, login, logout, confirm-email, resend-confirmation, forgot-password and reset-password under /api/account. Mutations require the antiforgery cookie and X-XSRF-TOKEN header, including anonymous registration/login. Angular obtains a fresh token before each mutation and uses HttpClient's normal XSRF handling. Tokens are refreshed against the current identity after login/logout.
+
+Local email links default to http://localhost:4200; Accounts:PublicOrigin may override this trusted origin. Outside Development the local sender is disabled and email-dependent account endpoints return 503 until a real delivery implementation is configured. No email is sent to external recipients by this demo setup. See [the account decision](decisions/002-accounts.md) for deployment requirements.

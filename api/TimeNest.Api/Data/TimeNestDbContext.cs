@@ -1,10 +1,12 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using TimeNest.Api.Features.Businesses;
 using TimeNest.Api.Features.Vacancies;
 
 namespace TimeNest.Api.Data;
 
-public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> options) : DbContext(options)
+public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> options) : IdentityDbContext<IdentityUser>(options)
 {
     public DbSet<Business> Businesses => Set<Business>();
     public DbSet<ServiceType> ServiceTypes => Set<ServiceType>();
@@ -12,6 +14,7 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<Business>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(160);

@@ -1,0 +1,72 @@
+<main class="workspace narrow">
+  <a routerLink="/" aria-label="TimeNest - etusivu"
+    ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
+  /></a>
+  <nav class="workspace-nav" aria-label="Tilin valikko">
+    <a routerLink="/">Löydä aika</a><a routerLink="/account">Oma tili</a>
+  </nav>
+  <h1>{{ title }}</h1>
+  @if (busy()) {
+    <p role="status">Odota hetki…</p>
+  }
+  @if (error()) {
+    <p class="form-error" role="alert">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="form-success" role="status">{{ message() }}</p>
+  }
+  @if (mode === 'home') {
+    @if (!busy() && !error()) {
+      @if (session.user(); as user) {
+        <p>Olet kirjautunut: {{ user.email }}</p>
+        <button class="secondary-button" type="button" (click)="logout()" [disabled]="busy()">
+          Kirjaudu ulos
+        </button>
+      } @else {
+        <p>Kirjaudu sisään tai luo tili jatkaaksesi.</p>
+      }
+    }
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()" class="workspace-form">
+      @if (needsEmail) {
+        <label for="email">Sähköposti</label>
+        <input
+          id="email"
+          type="email"
+          autocomplete="email"
+          formControlName="email"
+          maxlength="254"
+        />
+        @if (form.controls.email.touched && form.controls.email.invalid) {
+          <p class="form-error">Anna kelvollinen sähköpostiosoite.</p>
+        }
+      }
+      @if (needsPassword) {
+        <label for="password">Salasana</label>
+        <input
+          id="password"
+          type="password"
+          [attr.autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
+          formControlName="password"
+          minlength="12"
+          maxlength="128"
+          aria-describedby="password-hint"
+        />
+        <p id="password-hint">Vähintään 12 merkkiä. Voit käyttää pitkää salasanalauseketta.</p>
+        @if (form.controls.password.touched && form.controls.password.invalid) {
+          <p class="form-error">Salasanan pituuden tulee olla 12–128 merkkiä.</p>
+        }
+      }
+      @if (mode === 'confirm-email') {
+        <p>Vahvista sähköpostiosoitteesi painamalla alla olevaa painiketta.</p>
+      }
+      <button class="primary-button" type="submit" [disabled]="busy()">{{ title }}</button>
+    </form>
+  }
+  <nav class="workspace-nav" aria-label="Kirjautumisen vaihtoehdot">
+    <a routerLink="/account/login">Kirjaudu</a>
+    <a routerLink="/account/register">Luo tili</a>
+    <a routerLink="/account/forgot">Unohtuiko salasana?</a>
+    <a routerLink="/account/resend">Uusi vahvistuslinkki</a>
+  </nav>
+</main>
