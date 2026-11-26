@@ -1,0 +1,127 @@
+@import '@fontsource/poppins/latin-400.css';
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-600.css';
+@import '@fontsource/playfair-display/latin-400.css';
+@import '@fontsource/playfair-display/latin-500.css';
+@import '@fontsource/great-vibes/latin-400.css';
+
+:root {
+  --brand: #b667f1;
+  --brand-ink: #7436a0;
+  --brand-soft: #f7effd;
+  --text: #333333;
+  --muted: #666666;
+  --surface: #ffffff;
+  --canvas: #f9f9f9;
+  --border: #e5e5e5;
+  --error: #a62437;
+  color-scheme: light;
+  font-family: 'Poppins', sans-serif;
+  color: var(--text);
+  background: var(--surface);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1,
+h2,
+h3 {
+  font-family: 'Playfair Display', serif;
+  font-weight: 500;
+  line-height: 1.2;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+a {
+  color: inherit;
+  text-underline-offset: 5px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--brand-ink);
+  outline-offset: 4px;
+}
+button,
+input,
+select {
+  min-height: 44px;
+}
+::selection {
+  background: #ead5fa;
+}
+svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.skip-link {
+  position: fixed;
+  top: -5rem;
+  left: 1rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  z-index: 10;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+.primary-button {
+  border: 1px solid var(--brand-ink);
+  border-radius: 10px;
+  padding: 0.8rem 1.6rem;
+  color: white;
+  background: var(--brand-ink);
+  font-weight: 500;
+}
+.primary-button:hover:not(:disabled) {
+  background: #5e2885;
+}
+.secondary-button {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 1.2rem;
+}
+.secondary-button:hover:not(:disabled) {
+  background: var(--brand-soft);
+  border-color: #d7b5ed;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
