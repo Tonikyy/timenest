@@ -1,0 +1,83 @@
+<main class="workspace narrow">
+  <a routerLink="/" aria-label="TimeNest - etusivu"
+    ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
+  /></a>
+  <nav class="workspace-nav" aria-label="Yrityksen valikko">
+    <a routerLink="/">Löydä aika</a><a routerLink="/account">Oma tili</a>
+  </nav>
+  <h1>Yritysprofiili</h1>
+  <p>
+    Yksi yritys ja toimipaikka tiliä kohden. Käytä esittelyssä kuvitteellisen yrityksen tietoja.
+  </p>
+  @if (loading()) {
+    <p role="status">Ladataan profiilia…</p>
+  }
+  @if (error()) {
+    <p class="form-error" role="alert">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="form-success" role="status">{{ message() }}</p>
+  }
+  @if (signedOut()) {
+    <a routerLink="/account/login">Kirjaudu sisään</a>
+  }
+  @if (!loading()) {
+    <button class="secondary-button" type="button" (click)="load()" [disabled]="saving()">
+      Lataa profiili uudelleen
+    </button>
+  }
+  @if (loaded()) {
+    <form class="workspace-form" [formGroup]="form" (ngSubmit)="save()">
+      <label for="business-name">Yrityksen nimi</label
+      ><input id="business-name" formControlName="name" maxlength="160" required />
+      <label for="address">Katuosoite</label
+      ><input
+        id="address"
+        formControlName="address"
+        maxlength="240"
+        autocomplete="street-address"
+        required
+      />
+      <label for="city">Kaupunki</label
+      ><input
+        id="city"
+        formControlName="city"
+        maxlength="100"
+        autocomplete="address-level2"
+        required
+      />
+      <p id="location-help">
+        Anna toimipaikan koordinaatit esimerkiksi karttapalvelusta. Niitä käytetään lähellä olevien
+        aikojen haussa.
+      </p>
+      <label for="latitude">Leveysaste</label
+      ><input
+        id="latitude"
+        type="number"
+        step="any"
+        min="-90"
+        max="90"
+        formControlName="latitude"
+        aria-describedby="location-help"
+        required
+      />
+      <label for="longitude">Pituusaste</label
+      ><input
+        id="longitude"
+        type="number"
+        step="any"
+        min="-180"
+        max="180"
+        formControlName="longitude"
+        aria-describedby="location-help"
+        required
+      />
+      @if (form.touched && form.invalid) {
+        <p class="form-error" role="alert">Täytä kaikki kentät ja tarkista koordinaatit.</p>
+      }
+      <button class="primary-button" type="submit" [disabled]="saving()">
+        {{ saving() ? 'Tallennetaan…' : 'Tallenna profiili' }}
+      </button>
+    </form>
+  }
+</main>

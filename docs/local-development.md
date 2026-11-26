@@ -70,3 +70,9 @@ Run the setup script again after pulling the accounts PR to apply the Identity m
 The API provides GET /api/account/me and /api/account/csrf, plus POST register, login, logout, confirm-email, resend-confirmation, forgot-password and reset-password under /api/account. Mutations require the antiforgery cookie and X-XSRF-TOKEN header, including anonymous registration/login. Angular obtains a fresh token before each mutation and uses HttpClient's normal XSRF handling. Tokens are refreshed against the current identity after login/logout.
 
 Local email links default to http://localhost:4200; Accounts:PublicOrigin may override this trusted origin. Outside Development the local sender is disabled and email-dependent account endpoints return 503 until a real delivery implementation is configured. No email is sent to external recipients by this demo setup. See [the account decision](decisions/002-accounts.md) for deployment requirements.
+
+## Business profiles
+
+A verified account can create one fictional business at /business. Name, address, city and explicit map coordinates are required; coordinates drive nearby search. GET /api/business returns only the caller's profile (or JSON null). POST creates a profile and PUT edits it, with antiforgery protection. The server assigns ownership and demo status; callers cannot set either.
+
+A filtered unique SQL index enforces one business per owner even for concurrent requests. Existing seeded businesses retain null owners and cannot be claimed through this API. PUT requires the base64 version returned by GET; stale edits return 409. Reload the profile explicitly before retrying so another edit is not silently overwritten. Business deletion and owner transfer are outside this MVP slice.

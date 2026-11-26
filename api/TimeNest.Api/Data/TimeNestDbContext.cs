@@ -18,6 +18,9 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
         modelBuilder.Entity<Business>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(160);
+            entity.Property(x => x.Version).IsRowVersion();
+            entity.HasIndex(x => x.OwnerId).IsUnique();
+            entity.HasOne<IdentityUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.Address).HasMaxLength(240);
             entity.Property(x => x.City).HasMaxLength(100);
             entity.Property(x => x.Location).HasColumnType("geography");

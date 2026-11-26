@@ -19,6 +19,7 @@
     @if (!busy() && !error()) {
       @if (session.user(); as user) {
         <p>Olet kirjautunut: {{ user.email }}</p>
+        <p><a routerLink="/business">Oma yritys</a></p>
         <button class="secondary-button" type="button" (click)="logout()" [disabled]="busy()">
           Kirjaudu ulos
         </button>
