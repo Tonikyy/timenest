@@ -28,6 +28,7 @@ export class Discovery {
   private readonly api = inject(DiscoveryApi);
   private readonly destroyRef = inject(DestroyRef);
   private readonly requests = new Subject<SearchQuery>();
+  private submittedQuery: SearchQuery | null = null;
   private readonly details = viewChild.required<ElementRef<HTMLDialogElement>>('details');
 
   readonly locations = locations;
@@ -84,7 +85,7 @@ export class Discovery {
       });
   }
 
-  search(page = 1) {
+  search() {
     const filters = this.filters.getRawValue();
     const location =
       filters.location === 'current'
@@ -100,15 +101,22 @@ export class Discovery {
         return;
       }
     }
-    this.requests.next({
+    this.submittedQuery = {
       latitude: location.latitude,
       longitude: location.longitude,
       radiusKm: filters.radiusKm,
-      page,
+      page: 1,
       pageSize: 6,
       serviceTypeId: this.selectedCategory(),
       ...range,
-    });
+    };
+    this.requests.next(this.submittedQuery);
+  }
+
+  goToPage(page: number) {
+    if (this.submittedQuery) {
+      this.requests.next({ ...this.submittedQuery, page });
+    }
   }
 
   chooseCategory(id: string) {

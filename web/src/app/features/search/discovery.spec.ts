@@ -85,4 +85,80 @@ describe('Discovery', () => {
     expect(request.request.params.has('from')).toBe(false);
     request.flush(empty);
   });
+
+  it.each([
+    {
+      label: 'date',
+      filters: { date: '2027-01-15' },
+      expected: { from: '2027-01-14T22:00:00.000Z', to: '2027-01-15T22:00:00.000Z' },
+    },
+    {
+      label: 'area',
+      filters: { location: 'espoo' },
+      expected: { latitude: '60.1769', longitude: '24.8052' },
+    },
+    {
+      label: 'radius',
+      filters: { radiusKm: 5 },
+      expected: { radiusKm: '5' },
+    },
+  ])(
+    'keeps the submitted search while paging with an edited $label',
+    async ({ filters, expected }) => {
+      const slots = Array.from({ length: 8 }, (_, index) => ({
+        id: String(index),
+        title: 'Test appointment',
+        description: 'Fictional test data',
+        serviceTypeId: 'hair',
+        serviceType: 'Hiukset',
+        businessName: 'Demo',
+        address: 'Demo 1',
+        city: 'Helsinki',
+        startsAt: '2027-01-15T08:00:00Z',
+        durationMinutes: 45,
+        priceCents: 4500,
+        currency: 'EUR',
+        distanceKm: 0,
+        isDemo: true,
+      }));
+      const initial = http.expectOne((req) => req.url === '/api/vacancies');
+      const submittedParams = initial.request.params;
+      initial.flush({ items: slots.slice(0, 6), total: 8, page: 1, pageSize: 6 });
+      await fixture.whenStable();
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelectorAll('.vacancy-card')).toHaveLength(6);
+
+      fixture.componentInstance.filters.patchValue(filters);
+      root.querySelectorAll<HTMLButtonElement>('.pagination button')[1].click();
+      const next = http.expectOne((req) => req.url === '/api/vacancies');
+      expect(next.request.params.get('page')).toBe('2');
+      expect(next.request.params.delete('page').toString()).toBe(
+        submittedParams.delete('page').toString(),
+      );
+      next.flush({ items: slots.slice(6), total: 8, page: 2, pageSize: 6 });
+      await fixture.whenStable();
+      expect(root.querySelectorAll('.vacancy-card')).toHaveLength(2);
+      expect(root.querySelector('.message-state')).toBeNull();
+
+      root.querySelectorAll<HTMLButtonElement>('.pagination button')[0].click();
+      const previous = http.expectOne((req) => req.url === '/api/vacancies');
+      expect(previous.request.params.toString()).toBe(submittedParams.toString());
+      previous.flush({ items: slots.slice(0, 6), total: 8, page: 1, pageSize: 6 });
+      await fixture.whenStable();
+
+      root
+        .querySelector('form')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      const updated = http.expectOne((req) => req.url === '/api/vacancies');
+      expect(updated.request.params.get('page')).toBe('1');
+      for (const [name, value] of Object.entries(expected)) {
+        expect(updated.request.params.get(name)).toBe(value);
+      }
+      updated.flush({ items: slots.slice(0, 3), total: 3, page: 1, pageSize: 6 });
+      await fixture.whenStable();
+      expect(root.querySelectorAll('.vacancy-card')).toHaveLength(3);
+      expect(root.querySelector('.message-state')).toBeNull();
+      expect(root.querySelector('.pagination')).toBeNull();
+    },
+  );
 });

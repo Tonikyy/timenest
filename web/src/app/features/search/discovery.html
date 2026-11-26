@@ -213,7 +213,7 @@
                 type="button"
                 class="secondary-button"
                 [disabled]="results.page === 1"
-                (click)="search(results.page - 1)"
+                (click)="goToPage(results.page - 1)"
               >
                 Edellinen
               </button>
@@ -222,7 +222,7 @@
                 type="button"
                 class="secondary-button"
                 [disabled]="results.page * results.pageSize >= results.total"
-                (click)="search(results.page + 1)"
+                (click)="goToPage(results.page + 1)"
               >
                 Seuraava
               </button>
