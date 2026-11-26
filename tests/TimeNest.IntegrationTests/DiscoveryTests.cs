@@ -10,7 +10,8 @@ using TimeNest.Api.Features.Vacancies;
 
 namespace TimeNest.IntegrationTests;
 
-public sealed class DiscoveryTests(ApiFixture fixture) : IClassFixture<ApiFixture>
+[Collection("API")]
+public sealed class DiscoveryTests(ApiFixture fixture)
 {
     [Fact]
     public async Task Search_excludes_past_held_booked_cancelled_and_distant_slots()

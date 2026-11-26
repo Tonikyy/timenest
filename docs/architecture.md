@@ -24,8 +24,8 @@ Only create folders that contain implemented functionality. The tree describes i
 
 Controllers handle HTTP and validation. EF Core owns persistence. Extract business operations into feature services when they become nontrivial. Do not introduce repositories wrapping every DbSet, mediator pipelines, or separate deployable services without a concrete need.
 
-Angular talks to relative /api URLs. A development proxy reaches the API locally; the planned Azure host serves the compiled frontend and API on the same origin. Browser cookies and antiforgery are the proposed identity model.
+Angular talks to relative /api URLs. A development proxy reaches the API locally; the planned Azure host serves the compiled frontend and API on the same origin. ASP.NET Core Identity, browser cookies and antiforgery are the accepted identity model; see decisions/002-accounts.md.
 
 SQL Server is the source of truth for bookings and financial state. Stripe is the payment processor. Webhook processing and reconciliation must tolerate retries, out-of-order events, restarts, and partial failure between SQL and Stripe.
 
-Demo data is an explicit opt-in development operation. Never seed automatically in production. Azure deployment, identity, and payment integrations are later milestones, not features supplied by the initial foundation.
+Demo data is an explicit opt-in development operation. Never seed automatically in production. Identity is implemented in the accounts slice. Azure deployment and payment integrations remain later milestones.

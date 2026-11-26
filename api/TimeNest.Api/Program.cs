@@ -1,9 +1,10 @@
+using TimeNest.Api.Features.Accounts;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using TimeNest.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews(options => options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute()));
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -15,6 +16,7 @@ builder.Services.AddDbContext<TimeNestDbContext>(options =>
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("sql-server", tags: ["ready"]);
 
+builder.Services.AddAccounts(builder.Environment);
 var app = builder.Build();
 if (args.Contains("--migrate") || args.Contains("--seed-demo"))
 {
@@ -36,6 +38,9 @@ if (args.Contains("--migrate") || args.Contains("--seed-demo"))
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {

@@ -125,3 +125,58 @@ svg {
     scroll-behavior: auto !important;
   }
 }
+
+.workspace {
+  width: min(900px, calc(100% - 32px));
+  margin: 32px auto 64px;
+}
+.workspace.narrow {
+  max-width: 560px;
+}
+.workspace h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 24px 0;
+}
+.workspace h2 {
+  margin: 24px 0 12px;
+}
+.workspace p {
+  margin-block: 12px;
+}
+.workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-block: 24px;
+}
+.workspace-form {
+  display: grid;
+  gap: 12px;
+  margin-block: 24px;
+}
+.workspace-form input,
+.workspace-form textarea,
+.workspace-form select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: white;
+  color: var(--text);
+}
+.workspace-form label {
+  font-weight: 500;
+}
+.workspace-form p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.form-error {
+  color: var(--error);
+}
+.form-success {
+  background: var(--brand-soft);
+  padding: 16px;
+  border-radius: 8px;
+}

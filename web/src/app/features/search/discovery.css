@@ -39,7 +39,7 @@
   color: var(--brand-ink);
   border-bottom: 2px solid var(--brand);
 }
-.demo-label {
+.account-link {
   font-size: 0.8125rem;
   padding: 0.35rem 0.8rem;
   border: 1px solid #ead7f6;
@@ -487,9 +487,7 @@ h2 {
   .site-header nav a {
     font-size: 0.875rem;
   }
-  .demo-label {
-    display: none;
-  }
+
   .hero {
     padding-top: 35px;
   }

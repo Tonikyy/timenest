@@ -13,8 +13,9 @@ The first runnable slice includes:
 - Responsive Angular discovery page and appointment details in Finnish.
 - Explicitly fictional, opt-in demo data.
 - Health checks, SQL Server integration tests, frontend tests, and GitHub Actions.
+- Accounts with email verification, cookie login/logout and password recovery (local development email).
 
-Account registration, business publishing, bookings, payments, refunds, and Azure deployment are planned next. The current interface is read-only and does not accept bookings or payments.
+Business publishing, bookings, payments, refunds, and Azure deployment are planned next. Discovery is read-only; accounts are available, but bookings and payments are not enabled.
 
 ## Run locally
 
@@ -54,7 +55,7 @@ Integration tests start their own SQL Server container and do not modify the loc
 
 Build a working demo with sandbox payments first, then a real pilot. Customer payments and the platform fee are part of the MVP.
 
-One backend application with feature folders, one Angular application, and one SQL database. Proposed deployment: serve the Angular build and API from the same Azure App Service, backed by Azure SQL. Identity and Stripe integration decisions are recorded before their implementation.
+One backend application with feature folders, one Angular application, and one SQL database. Proposed deployment: serve the Angular build and API from the same Azure App Service, backed by Azure SQL. Identity uses ASP.NET Core Identity and same-origin cookies. Stripe integration remains a separate payment step.
 
 - [MVP scope and milestones](docs/mvp.md)
 - [Architecture](docs/architecture.md)
