@@ -18,6 +18,7 @@ Read docs/mvp.md and docs/architecture.md before changing behavior. Preserve the
 
 ## Verification and delivery
 
+- During code review, apply the additional simplicity guidance in [REVIEW.md](REVIEW.md).
 - Run the builds and relevant tests for the changed area. Database behavior is tested against SQL Server.
 - Use separate pull requests for separate concerns. Stack dependent PRs and explain the base dependency.
 - Do not merge PRs automatically.
