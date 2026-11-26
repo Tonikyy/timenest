@@ -11,11 +11,11 @@ The first runnable slice includes:
 - ASP.NET Core API with EF Core migrations and SQL Server.
 - Database-side nearby search with service/date/radius filters and pagination.
 - Responsive Angular discovery page and appointment details in Finnish.
-- Explicitly fictional, opt-in demo data.
+- Explicitly fictional, opt-in demo data and owner-managed demo openings.
 - Health checks, SQL Server integration tests, frontend tests, and GitHub Actions.
 - Accounts with email verification, cookie login/logout and password recovery (local development email).
 
-Business vacancy publishing, bookings, payments, refunds, and Azure deployment are planned next. Discovery is read-only; accounts and owner-managed demo business profiles are available, but bookings and payments are not enabled.
+Verified accounts can manage their demo business profile and publish, edit and cancel fictional openings. Stripe sandbox onboarding, bookings, payments, refunds and Azure deployment remain next. Bookings and payments are not enabled.
 
 ## Run locally
 

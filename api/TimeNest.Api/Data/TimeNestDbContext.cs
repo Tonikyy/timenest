@@ -33,6 +33,7 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
         modelBuilder.Entity<Vacancy>(entity =>
         {
             entity.Property(x => x.Title).HasMaxLength(160);
+            entity.Property(x => x.Version).IsRowVersion();
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.ServiceTypeId).HasMaxLength(40);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);

@@ -1,0 +1,181 @@
+<main class="workspace">
+  <a routerLink="/" aria-label="TimeNest - etusivu"
+    ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
+  /></a>
+  <nav class="workspace-nav" aria-label="Yrityksen valikko">
+    <a routerLink="/">Löydä aika</a><a routerLink="/business">Yritysprofiili</a
+    ><a routerLink="/account">Oma tili</a>
+  </nav>
+  <h1>Yrityksen vapaat ajat</h1>
+  <p>
+    Julkaise kuvitteellisia esittelyaikoja asiakkaiden hakuun. Varaaminen ja maksaminen eivät ole
+    vielä käytössä.
+  </p>
+  @if (loading()) {
+    <p role="status">Ladataan aikoja…</p>
+  }
+  @if (error()) {
+    <p class="form-error" role="alert">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="form-success" role="status">{{ message() }}</p>
+  }
+  @if (signedOut()) {
+    <a routerLink="/account/login">Kirjaudu sisään</a>
+  }
+  <button
+    type="button"
+    class="secondary-button"
+    (click)="load()"
+    [disabled]="loading() || saving()"
+  >
+    Lataa lista uudelleen
+  </button>
+  @if (!loading() && result()) {
+    @if (!profile()) {
+      <p><a routerLink="/business">Luo ensin yritysprofiili</a> ennen ajan julkaisua.</p>
+    } @else {
+      <h2>{{ selected() ? 'Muokkaa esittelyaikaa' : 'Julkaise esittelyaika' }}</h2>
+      <form [formGroup]="form" (ngSubmit)="save()" class="workspace-form">
+        <label for="title">Palvelun nimi</label
+        ><input id="title" #titleInput formControlName="title" maxlength="160" required />
+        <label for="description">Kuvaus</label
+        ><textarea
+          id="description"
+          formControlName="description"
+          maxlength="1000"
+          rows="3"
+          required
+        ></textarea>
+        <label for="service">Palveluluokka</label
+        ><select id="service" formControlName="serviceTypeId" required>
+          <option value="">Valitse palvelu</option>
+          @for (category of categories(); track category.id) {
+            <option [value]="category.id">{{ category.name }}</option>
+          }
+        </select>
+        <label for="slot-date">Päivä</label
+        ><input id="slot-date" type="date" formControlName="date" required />
+        <label for="slot-time">Alkamisaika (Suomen aikaa)</label
+        ><input
+          id="slot-time"
+          type="time"
+          formControlName="time"
+          required
+          aria-describedby="time-hint"
+        />
+        <p id="time-hint">
+          Kaikki ajat annetaan Suomen ajassa. Kesäajan siirtymän päälle osuva epäselvä kellonaika
+          pitää vaihtaa.
+        </p>
+        <label for="duration">Kesto (minuuttia)</label
+        ><input
+          id="duration"
+          type="number"
+          min="5"
+          max="480"
+          step="1"
+          formControlName="durationMinutes"
+          required
+        />
+        <label for="price">Hinta (€)</label
+        ><input
+          id="price"
+          inputmode="decimal"
+          formControlName="price"
+          placeholder="45,00"
+          required
+        />
+        @if (form.touched && form.invalid) {
+          <p class="form-error" role="alert">
+            Täytä kaikki kentät. Käytä hinnassa enintään kahta desimaalia.
+          </p>
+        }
+        <div class="workspace-nav">
+          <button class="primary-button" type="submit" [disabled]="saving()">
+            {{
+              saving()
+                ? 'Tallennetaan…'
+                : selected()
+                  ? 'Tallenna muutokset'
+                  : 'Julkaise esittelyaika'
+            }}
+          </button>
+          @if (selected()) {
+            <button class="secondary-button" type="button" (click)="reset()" [disabled]="saving()">
+              Lopeta muokkaus
+            </button>
+          }
+        </div>
+      </form>
+      @if (result(); as page) {
+        <h2>Omat ajat ({{ page.total }})</h2>
+        @if (!page.items.length) {
+          <p>Sinulla ei ole vielä julkaistuja aikoja.</p>
+        }
+        @for (slot of page.items; track slot.id) {
+          <article class="managed-slot">
+            <h3>{{ slot.title }}</h3>
+            <p>
+              <time [attr.datetime]="slot.startsAt"
+                >{{ day(slot.startsAt) }} klo {{ time(slot.startsAt) }}</time
+              >
+              · {{ slot.durationMinutes }} min · {{ price(slot.priceCents) }}
+            </p>
+            <p>{{ status[slot.status] }}</p>
+            @if (slot.cancelledAt) {
+              <p>Peruttu {{ day(slot.cancelledAt) }} klo {{ time(slot.cancelledAt) }}</p>
+            }
+            @if (editable(slot)) {
+              <div class="workspace-nav">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  (click)="edit(slot)"
+                  [disabled]="saving()"
+                >
+                  Muokkaa
+                </button>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  (click)="pendingCancel() === slot.id ? cancel(slot) : pendingCancel.set(slot.id)"
+                  [disabled]="saving()"
+                >
+                  {{ pendingCancel() === slot.id ? 'Vahvista peruminen' : 'Peru aika' }}
+                </button>
+                @if (pendingCancel() === slot.id) {
+                  <span>Poistetaanko aika asiakkaiden hausta?</span>
+                  <button type="button" class="secondary-button" (click)="pendingCancel.set(null)">
+                    Palaa
+                  </button>
+                }
+              </div>
+            }
+          </article>
+        }
+        @if (page.total > page.pageSize) {
+          <nav class="workspace-nav" aria-label="Omien aikojen sivut">
+            <button
+              type="button"
+              class="secondary-button"
+              (click)="load(page.page - 1)"
+              [disabled]="page.page === 1 || saving()"
+            >
+              Edellinen
+            </button>
+            <span>Sivu {{ page.page }}</span>
+            <button
+              type="button"
+              class="secondary-button"
+              (click)="load(page.page + 1)"
+              [disabled]="page.page * page.pageSize >= page.total || saving()"
+            >
+              Seuraava
+            </button>
+          </nav>
+        }
+      }
+    }
+  }
+</main>
