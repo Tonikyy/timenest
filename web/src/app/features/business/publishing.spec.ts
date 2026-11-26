@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PublishingPage } from './publishing';
 import { ManagedVacancy } from './publishing-api';
 
@@ -39,6 +39,7 @@ describe('Demo publishing', () => {
       .flush({ items, total: items.length, page: 1, pageSize: 12 });
   }
   beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.UTC(2027, 0, 15));
     TestBed.configureTestingModule({
       imports: [PublishingPage],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
@@ -49,6 +50,7 @@ describe('Demo publishing', () => {
   afterEach(() => {
     http.verify();
     fixture.destroy();
+    vi.restoreAllMocks();
   });
 
   it('requires a business profile before showing a publishing form', async () => {
