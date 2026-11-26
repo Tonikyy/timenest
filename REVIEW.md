@@ -33,6 +33,15 @@ Apply these checks when the change touches the relevant behavior. Do not require
 - Preserve the original logo and [brand](docs/brand.md), Finnish customer-facing text, and clear loading, empty, and error states. Keep infrastructure details out of product screens.
 - Respect the demo-first scope. Sandbox payments and proposed policies are not live payment readiness; Azure provisioning and live payments require their own explicitly authorized work.
 
+## Test confidence
+
+Every review must explicitly answer: **Is this feature tested well enough that we can be confident it works?**
+
+- Assess evidence for the intended behavior, meaningful failure paths, and regressions. Passing tests or a coverage percentage alone are not sufficient if the important behavior is untested.
+- Match verification to the risk: focused business-rule tests, SQL Server integration tests for persistence and concurrency, and UI or end-to-end checks for affected user journeys. For booking and payment changes, consider duplicate requests, races, retries, and partial failures.
+- State whether the evidence is sufficient and why. Distinguish checks actually run from tests only inspected, and name anything unverified. If confidence is insufficient, identify the concrete scenario and the smallest useful additional check; do not invent passing results.
+- Keep the assessment proportionate. Documentation-only changes need relevant document checks, and simple changes do not need elaborate test scaffolding. Apply the same confidence question to every review.
+
 ## Review discipline
 
 Ground findings in the changed code and a concrete scenario. Explain the consequence and point to the smallest useful location. Do not report personal style preferences, speculative future requirements, or unrelated pre-existing problems as defects in the change.
