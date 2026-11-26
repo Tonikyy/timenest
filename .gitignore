@@ -426,3 +426,14 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# TimeNest local tooling and frontend output
+.angular/
+dist/
+coverage/
+output/
+.playwright-cli/
+.env
+.env.*
+!.env.example
+api/TimeNest.Api/wwwroot/
