@@ -7,6 +7,8 @@ public enum VacancyStatus { Available, Held, Booked, Cancelled }
 public sealed class Vacancy
 {
     public Guid Id { get; set; }
+    public byte[] Version { get; set; } = [];
+    public DateTimeOffset? CancelledAt { get; set; }
     public Guid BusinessId { get; set; }
     public Business Business { get; set; } = null!;
     public required string ServiceTypeId { get; set; }

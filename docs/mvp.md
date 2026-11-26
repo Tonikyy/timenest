@@ -42,8 +42,8 @@ These are demo policies, not finalized terms for a real-money pilot.
 ## Milestones
 
 1. **Runnable foundation:** Angular calls ASP.NET Core and SQL Server; migration, clearly marked demo openings, CI, original branding.
-2. **Business publishing:** accounts, business ownership/profile, payment onboarding, publish/manage slots.
-3. **Discovery and paid booking:** location/service/date search, reservation, Checkout, verified payment confirmation, double-booking protection.
+2. **Business publishing:** accounts, business ownership/profile, publish/manage demo slots. Stripe sandbox onboarding follows as the next separate payment step.
+3. **Discovery and paid booking:** Stripe sandbox onboarding, location/service/date search, reservation, Checkout, verified payment confirmation, double-booking protection.
 4. **Cancellation and recovery:** refunds, abandoned-checkout cleanup, retry-safe webhook processing, dashboards, notification delivery.
 5. **Azure demo:** Bicep, OIDC deployment, controlled migrations, monitoring, costs, end-to-end smoke tests.
 6. **Real pilot:** live onboarding, agreed commercial/cancellation policies, operational recovery and real email delivery.

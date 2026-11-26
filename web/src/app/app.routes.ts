@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { PublishingPage } from './features/business/publishing';
 import { BusinessPage } from './features/business/business';
 import { Discovery } from './features/search/discovery';
 import { AccountPage } from './features/account/account';
@@ -13,5 +14,6 @@ export const routes: Routes = [
   { path: 'account/confirm', component: AccountPage, data: { mode: 'confirm-email' } },
   { path: 'account/resend', component: AccountPage, data: { mode: 'resend-confirmation' } },
   { path: 'business', component: BusinessPage },
+  { path: 'business/vacancies', component: PublishingPage },
   { path: '**', redirectTo: '' },
 ];

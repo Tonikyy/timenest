@@ -33,7 +33,7 @@ Demo appointments start tomorrow in Europe/Helsinki and span four days. Re-runni
 
 Search parameters: latitude, longitude, radiusKm (1–100), serviceTypeId, from (inclusive), to (exclusive), page (1–10000), pageSize (1–50). Defaults: Helsinki center, 10 km, first page, 12 results. Send ISO timestamps with an explicit offset. Date input displayed in Finland must be converted using Europe/Helsinki rather than the visitor's machine timezone.
 
-Search is read-only. Account endpoints are described below; publishing, booking and payment endpoints are not included in the accounts slice. The API never returns fallback demo data if SQL Server is unavailable.
+Search is read-only. Account endpoints are described below; business publishing is described below; booking and payment endpoints are not implemented. The API never returns fallback demo data if SQL Server is unavailable.
 
 ## Build and test
 
@@ -76,3 +76,12 @@ Local email links default to http://localhost:4200; Accounts:PublicOrigin may ov
 A verified account can create one fictional business at /business. Name, address, city and explicit map coordinates are required; coordinates drive nearby search. GET /api/business returns only the caller's profile (or JSON null). POST creates a profile and PUT edits it, with antiforgery protection. The server assigns ownership and demo status; callers cannot set either.
 
 A filtered unique SQL index enforces one business per owner even for concurrent requests. Existing seeded businesses retain null owners and cannot be claimed through this API. PUT requires the base64 version returned by GET; stale edits return 409. Reload the profile explicitly before retrying so another edit is not silently overwritten. Business deletion and owner transfer are outside this MVP slice.
+## Demo vacancy publishing
+
+Open /business/vacancies after creating a profile. Publish, edit and cancel fictional openings; the customer search reads the same SQL records. Only future Available slots can be edited or cancelled. Held/booked slots are rejected rather than changing a reservation's details. Cancellation retains the row, status and UTC cancellation timestamp; repeated cancellation is harmless.
+
+GET /api/business/vacancies lists only the caller's slots (page 1–10000, pageSize 1–50; default 12), with future dates first. POST publishes, PUT /{id} edits and POST /{id}/cancel cancels. Mutations require authentication and CSRF. Edits/cancellations carry the base64 rowversion returned by the list; conflicts return 409, and another owner's IDs return 404.
+
+Publication fields: title, description, serviceTypeId, date (YYYY-MM-DD), time (HH:mm:ss, whole minutes), durationMinutes (5–480), priceCents (positive integer EUR cents). The server converts Europe/Helsinki calendar input to UTC and rejects past, nonexistent spring-transition, and ambiguous autumn-transition times. Choose an unambiguous time rather than silently choosing a DST offset.
+
+Publishing is limited to demo businesses. All profiles created by this batch are marked demo by the server. Stripe sandbox onboarding is the next payment step; no booking, checkout, charge, refund or real-business publishing is enabled here.

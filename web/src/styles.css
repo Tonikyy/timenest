@@ -180,3 +180,13 @@ svg {
   padding: 16px;
   border-radius: 8px;
 }
+
+.managed-slot {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-block: 16px;
+}
+.workspace textarea {
+  font: inherit;
+}
