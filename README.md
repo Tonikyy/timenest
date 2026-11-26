@@ -24,3 +24,7 @@ The original SVG, purple palette, and Poppins / Playfair Display / Great Vibes t
 ## Development
 
 Implementation is delivered in separate, reviewable pull requests. Setup instructions are added with the API and Angular foundations. Nothing in this repository provisions Azure resources or enables live payments automatically.
+
+## API foundation
+
+The read-only discovery API, SQL Server migration, and fictional demo data are implemented. See [local setup and API reference](docs/local-development.md). Accounts, publishing, booking and payments remain later work.

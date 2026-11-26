@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/api/">
+    <Project Path="api/TimeNest.Api/TimeNest.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TimeNest.IntegrationTests/TimeNest.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
