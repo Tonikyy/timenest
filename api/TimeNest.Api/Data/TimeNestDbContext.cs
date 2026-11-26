@@ -2,12 +2,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using TimeNest.Api.Features.Businesses;
+using TimeNest.Api.Features.Payments;
 using TimeNest.Api.Features.Vacancies;
 
 namespace TimeNest.Api.Data;
 
 public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> options) : IdentityDbContext<IdentityUser>(options)
 {
+    public DbSet<StripeConnection> StripeConnections => Set<StripeConnection>();
     public DbSet<Business> Businesses => Set<Business>();
     public DbSet<ServiceType> ServiceTypes => Set<ServiceType>();
     public DbSet<Vacancy> Vacancies => Set<Vacancy>();
@@ -24,6 +26,14 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
             entity.Property(x => x.Address).HasMaxLength(240);
             entity.Property(x => x.City).HasMaxLength(100);
             entity.Property(x => x.Location).HasColumnType("geography");
+        });
+        modelBuilder.Entity<StripeConnection>(entity =>
+        {
+            entity.HasKey(x => x.BusinessId);
+            entity.Property(x => x.AccountId).HasMaxLength(255);
+            entity.HasIndex(x => x.AccountId).IsUnique();
+            entity.HasOne<Business>().WithOne().HasForeignKey<StripeConnection>(x => x.BusinessId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ServiceType>(entity =>
         {

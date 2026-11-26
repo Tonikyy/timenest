@@ -84,4 +84,38 @@ GET /api/business/vacancies lists only the caller's slots (page 1–10000, pageS
 
 Publication fields: title, description, serviceTypeId, date (YYYY-MM-DD), time (HH:mm:ss, whole minutes), durationMinutes (5–480), priceCents (positive integer EUR cents). The server converts Europe/Helsinki calendar input to UTC and rejects past, nonexistent spring-transition, and ambiguous autumn-transition times. Choose an unambiguous time rather than silently choosing a DST offset.
 
-Publishing is limited to demo businesses. All profiles created by this batch are marked demo by the server. Stripe sandbox onboarding is the next payment step; no booking, checkout, charge, refund or real-business publishing is enabled here.
+Publishing is limited to demo businesses. All profiles created by this batch are marked demo by the server. Stripe sandbox onboarding is described below; no booking, checkout, charge, refund or real-business publishing is enabled here.
+
+## Stripe sandbox onboarding
+
+The backend provides GET /api/business/payments and POST /api/business/payments/onboarding-link. Both require a signed-in owner; POST also requires the standard antiforgery token. The frontend flow follows in its separate PR. Existing demo publication remains available independently of onboarding.
+
+Configure a Connect-enabled Stripe sandbox in the Stripe Dashboard. Use only fictional test business information. Store its secret locally with .NET user-secrets under `Stripe:SecretKey` (sk_test_ prefix); do not put it in appsettings, source, screenshots, chat or command output. To avoid storing the key in PowerShell command history:
+
+```powershell
+$stripeSecret = Read-Host 'Stripe sandbox secret key' -MaskInput
+@{ 'Stripe:SecretKey' = $stripeSecret } | ConvertTo-Json -Compress |
+  dotnet user-secrets set --project api/TimeNest.Api
+Remove-Variable stripeSecret
+dotnet user-secrets set 'Stripe:PublicOrigin' 'http://localhost:4200' --project api/TimeNest.Api
+dotnet run --project api/TimeNest.Api -- --migrate
+dotnet run --project api/TimeNest.Api
+```
+
+The configured origin must be HTTPS, with no path, credentials, query or fragment. Local loopback HTTP is accepted only in Development/Testing. Keep the same sandbox paired with its database; use a separate database when switching Stripe sandboxes. Do not use live keys. No webhook secret or publishable key is needed for this hosted onboarding slice.
+
+GET returns noBusiness, unavailable (no key configured), notStarted, pendingCreation, recoveryRequired, incomplete or ready. Ready requires submitted details, charges enabled, payouts enabled and active transfers from the current Stripe account. Provider failures return 503, never a fabricated ready status. Onboarding status does not enable bookings or payments.
+
+A link is generated just in time for the authenticated owner. It returns to /business/payments?stripe=return; expired/used links return to ?stripe=refresh. Neither query changes account status. The upcoming UI offers an explicit continue button to request a fresh link. Never share or store these URLs.
+
+### Recover an uncertain account creation
+
+Within 23 hours, retry the onboarding POST: it uses the original idempotency key and payload. If Stripe created the account but the response or SQL association failed, the retry recovers that same account. Link failures leave the existing association intact.
+
+After 23 hours, automated creation stops. Pause onboarding requests for the affected business. In the original Stripe sandbox, find the creation request with idempotency key `timenest-connect-v1-{BusinessId in N format}` and the account with metadata `timenest_business_id` equal to that same 32-character ID. Verify the sandbox, FI/Express account and metadata before linking it. With a backup and a database transaction, update only the matching pending StripeConnections row where AccountId IS NULL to the verified account ID; require exactly one affected row. The unique account-ID index prevents associating one account with two businesses. Resume and confirm GET retrieves the account successfully.
+
+If creation provably never reached Stripe, an operator can reset CreationStartedAt after checking the sandbox request logs and accounts. If its outcome remains uncertain, leave it pending and investigate; do not delete the row, rotate its key, change sandboxes or create another account. There is deliberately no public endpoint for attaching arbitrary account IDs.
+
+### Validation
+
+The test suite uses a simulated HTTP transport behind the actual Stripe SDK plus a disposable SQL Server. No Stripe credentials are required and no external accounts are created by tests. A real sandbox smoke check remains necessary after configuration: start hosted onboarding, return before completion, resume using a fresh link, complete with Stripe test data, verify ready, and verify revoked capabilities no longer show ready. See [ADR 003](decisions/003-stripe-sandbox-onboarding.md).

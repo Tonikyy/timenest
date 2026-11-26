@@ -267,6 +267,27 @@ namespace TimeNest.Api.Data.Migrations
                     b.ToTable("Businesses");
                 });
 
+            modelBuilder.Entity("TimeNest.Api.Features.Payments.StripeConnection", b =>
+                {
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTimeOffset>("CreationStartedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("BusinessId");
+
+                    b.HasIndex("AccountId")
+                        .IsUnique()
+                        .HasFilter("[AccountId] IS NOT NULL");
+
+                    b.ToTable("StripeConnections");
+                });
+
             modelBuilder.Entity("TimeNest.Api.Features.Vacancies.ServiceType", b =>
                 {
                     b.Property<string>("Id")
@@ -403,6 +424,15 @@ namespace TimeNest.Api.Data.Migrations
                         .WithMany()
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("TimeNest.Api.Features.Payments.StripeConnection", b =>
+                {
+                    b.HasOne("TimeNest.Api.Features.Businesses.Business", null)
+                        .WithOne()
+                        .HasForeignKey("TimeNest.Api.Features.Payments.StripeConnection", "BusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TimeNest.Api.Features.Vacancies.Vacancy", b =>

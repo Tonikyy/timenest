@@ -16,9 +16,9 @@ public sealed class TestAccountEmail : IAccountEmail
     }
 }
 
-public sealed class AccountClient(ApiFixture fixture) : IDisposable
+public sealed class AccountClient(ApiFixture fixture, HttpClient? client = null) : IDisposable
 {
-    public HttpClient Http { get; } = fixture.Factory.CreateClient();
+    public HttpClient Http { get; } = client ?? fixture.Factory.CreateClient();
     public string Email { get; } = $"{Guid.NewGuid():N}@example.test";
     public const string Password = "A long demo passphrase!";
     public void Dispose() => Http.Dispose();

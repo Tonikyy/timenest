@@ -15,7 +15,7 @@ The first runnable slice includes:
 - Health checks, SQL Server integration tests, frontend tests, and GitHub Actions.
 - Accounts with email verification, cookie login/logout and password recovery (local development email).
 
-Verified accounts can manage their demo business profile and publish, edit and cancel fictional openings. Stripe sandbox onboarding, bookings, payments, refunds and Azure deployment remain next. Bookings and payments are not enabled.
+Verified accounts can manage their demo business profile and publish, edit and cancel fictional openings. The Stripe sandbox onboarding API is available; its business screen follows in a separate PR. Bookings, payments, refunds and Azure deployment remain next. Bookings and payments are not enabled.
 
 ## Run locally
 
@@ -55,7 +55,7 @@ Integration tests start their own SQL Server container and do not modify the loc
 
 Build a working demo with sandbox payments first, then a real pilot. Customer payments and the platform fee are part of the MVP.
 
-One backend application with feature folders, one Angular application, and one SQL database. Proposed deployment: serve the Angular build and API from the same Azure App Service, backed by Azure SQL. Identity uses ASP.NET Core Identity and same-origin cookies. Stripe integration remains a separate payment step.
+One backend application with feature folders, one Angular application, and one SQL database. Proposed deployment: serve the Angular build and API from the same Azure App Service, backed by Azure SQL. Identity uses ASP.NET Core Identity and same-origin cookies. Stripe sandbox account onboarding uses the official SDK and hosted forms; Checkout and payment recovery remain separate steps.
 
 - [MVP scope and milestones](docs/mvp.md)
 - [Architecture](docs/architecture.md)

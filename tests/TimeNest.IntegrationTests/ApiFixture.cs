@@ -18,6 +18,7 @@ public sealed class ApiFixture : IAsyncLifetime
 
     public static DateTimeOffset Now { get; } = new(2027, 1, 15, 8, 0, 0, TimeSpan.Zero);
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
+    public StripeStub Stripe { get; } = new();
     public TestAccountEmail Mail { get; } = new();
     public HttpClient Client { get; private set; } = null!;
 
@@ -28,9 +29,10 @@ public sealed class ApiFixture : IAsyncLifetime
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["ConnectionStrings:TimeNest"] = database.GetConnectionString() }));
+                new Dictionary<string, string?> { ["ConnectionStrings:TimeNest"] = database.GetConnectionString(), ["Stripe:SecretKey"] = "sk_test_local_stub_only" }));
             builder.ConfigureServices(services =>
             {
+                services.AddHttpClient("stripe").ConfigurePrimaryHttpMessageHandler(() => Stripe);
                 services.AddSingleton<TimeProvider>(new FixedClock());
                 services.AddSingleton<TimeNest.Api.Features.Accounts.IAccountEmail>(Mail);
                 // Freeze discovery time, but keep cookie issuance and stamp validation on the same live clock.
