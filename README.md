@@ -15,7 +15,7 @@ The first runnable slice includes:
 - Health checks, SQL Server integration tests, frontend tests, and GitHub Actions.
 - Accounts with email verification, cookie login/logout and password recovery (local development email).
 
-Business publishing, bookings, payments, refunds, and Azure deployment are planned next. Discovery is read-only; accounts are available, but bookings and payments are not enabled.
+Business vacancy publishing, bookings, payments, refunds, and Azure deployment are planned next. Discovery is read-only; accounts and owner-managed demo business profiles are available, but bookings and payments are not enabled.
 
 ## Run locally
 
