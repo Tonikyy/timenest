@@ -88,7 +88,7 @@ Publishing is limited to demo businesses. All profiles created by this batch are
 
 ## Stripe sandbox onboarding
 
-The backend provides GET /api/business/payments and POST /api/business/payments/onboarding-link. Both require a signed-in owner; POST also requires the standard antiforgery token. The frontend flow follows in its separate PR. Existing demo publication remains available independently of onboarding.
+The backend provides GET /api/business/payments and POST /api/business/payments/onboarding-link. Both require a signed-in owner; POST also requires the standard antiforgery token. Open /business/payments from either business screen. The Finnish page supports start/resume, incomplete/ready status, signed-out recovery and explicit retries. Existing demo publication remains available independently of onboarding.
 
 Configure a Connect-enabled Stripe sandbox in the Stripe Dashboard. Use only fictional test business information. Store its secret locally with .NET user-secrets under `Stripe:SecretKey` (sk_test_ prefix); do not put it in appsettings, source, screenshots, chat or command output. To avoid storing the key in PowerShell command history:
 
@@ -106,7 +106,7 @@ The configured origin must be HTTPS, with no path, credentials, query or fragmen
 
 GET returns noBusiness, unavailable (no key configured), notStarted, pendingCreation, recoveryRequired, incomplete or ready. Ready requires submitted details, charges enabled, payouts enabled and active transfers from the current Stripe account. Provider failures return 503, never a fabricated ready status. Onboarding status does not enable bookings or payments.
 
-A link is generated just in time for the authenticated owner. It returns to /business/payments?stripe=return; expired/used links return to ?stripe=refresh. Neither query changes account status. The upcoming UI offers an explicit continue button to request a fresh link. Never share or store these URLs.
+A link is generated just in time for the authenticated owner. It returns to /business/payments?stripe=return; expired/used links return to ?stripe=refresh. Neither query changes account status. The UI offers an explicit continue button to request a fresh link. Never share or store these URLs.
 
 ### Recover an uncertain account creation
 
