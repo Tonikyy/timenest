@@ -374,6 +374,51 @@ namespace TimeNest.Api.Data.Migrations
                     b.ToTable("Businesses");
                 });
 
+            modelBuilder.Entity("TimeNest.Api.Features.Payments.CheckoutPayment", b =>
+                {
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("LastCheckedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PaymentIntentId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("PublicOrigin")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("BookingId");
+
+                    b.HasIndex("PaymentIntentId")
+                        .IsUnique()
+                        .HasFilter("[PaymentIntentId] IS NOT NULL");
+
+                    b.HasIndex("SessionId")
+                        .IsUnique()
+                        .HasFilter("[SessionId] IS NOT NULL");
+
+                    b.ToTable("CheckoutPayments");
+                });
+
             modelBuilder.Entity("TimeNest.Api.Features.Payments.StripeConnection", b =>
                 {
                     b.Property<Guid>("BusinessId")
@@ -561,6 +606,15 @@ namespace TimeNest.Api.Data.Migrations
                         .WithMany()
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("TimeNest.Api.Features.Payments.CheckoutPayment", b =>
+                {
+                    b.HasOne("TimeNest.Api.Features.Bookings.Booking", null)
+                        .WithOne()
+                        .HasForeignKey("TimeNest.Api.Features.Payments.CheckoutPayment", "BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TimeNest.Api.Features.Payments.StripeConnection", b =>

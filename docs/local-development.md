@@ -119,3 +119,33 @@ If creation provably never reached Stripe, an operator can reset CreationStarted
 ### Validation
 
 The test suite uses a simulated HTTP transport behind the actual Stripe SDK plus a disposable SQL Server. No Stripe credentials are required and no external accounts are created by tests. A real sandbox run on 2026-11-27 verified v2 account creation, hosted onboarding with fictional identity data and Stripe's test bank account, return to TimeNest, and server-verified ready status. After configuring a different sandbox, repeat that check. Also check an early return and fresh-link resume, and verify revoked capabilities no longer show ready; those paths are covered by simulated tests but were not exercised against Stripe in this run. See [ADR 003](decisions/003-stripe-sandbox-onboarding.md).
+
+## Customer Checkout
+
+Apply the migrations, run the API and Angular, and use a verified customer account different from the business owner. Only fictional businesses with ready Stripe sandbox accounts can be booked. The API rechecks the recipient's current capabilities before reservation and before the first Checkout attempt.
+
+- POST /api/bookings with vacancyId reserves an available slot; retries by its customer reuse the active booking.
+- GET /api/bookings?page=1 and GET /api/bookings/{id} expose only the current customer's bookings.
+- POST /api/bookings/{id}/checkout starts/resumes the same Stripe session.
+- POST /api/bookings/{id}/refresh reconciles provider state, then returns the booking.
+- POST /api/payments/stripe/webhook accepts Stripe-signed platform Checkout events. It is the only payment mutation exempt from cookie CSRF.
+
+Customer mutations require the normal antiforgery token. Prices, fee, recipient and redirects never come from customer input. Stripe:ApplicationFeeCents defaults to 500; the advertised price must exceed the fee. Checkout is card-only with adaptive pricing disabled so the EUR snapshot remains authoritative. Start Checkout within four minutes of reservation; sessions expire 35 minutes after reservation. Open slots must start more than 40 minutes away.
+
+For local webhook forwarding, install the official Stripe CLI, select the same sandbox, and run:
+
+```powershell
+stripe listen --forward-to http://localhost:5080/api/payments/stripe/webhook --events checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed
+```
+
+Store the listener's signing secret locally as Stripe:WebhookSecret using a masked prompt and the JSON user-secrets technique above. Do not paste it into chat or commit it. Restart the API after configuration. The webhook validates the original request bytes, signature and timestamp, rejects live/connected-account events, and retrieves the current session and expanded PaymentIntent. Browser query parameters and event names cannot confirm a booking.
+
+A background worker scans durable pending rows every 30 seconds outside Testing. It shares the webhook/refresh transition logic and recovers payments even when the browser never returns or webhook delivery fails. Payment status and vacancy transition commit together. Duplicate/concurrent/out-of-order requests cannot confirm twice or revert a terminal booking. Recovery reads must verify the session identity, sandbox, amount, currency, fee and recipient.
+
+### Uncertain Checkout creation
+
+A missing session ID after a recorded attempt is an uncertain provider outcome, not proof that no payment is possible. Retries reuse the stored request payload, origin, absolute expiry and idempotency key timenest-checkout-v1-{bookingId in N format}. After 23 hours without an association, automatic creation stops and the payment requires recovery. A failed/expired creation request may also require reconciliation if its outcome cannot be recovered within the provider's replay window. Keep the reservation held.
+
+Pause work for that booking. In the same sandbox, inspect its idempotency key and timenest_booking_id metadata, verify the session and all snapshotted payment details, and associate only that verified session with the existing payment row in a transaction. Require exactly one updated row and preserve the unique session/payment-intent indexes. Set status back to Creating so reconciliation retrieves the association. Never delete payment history or create a replacement session for an uncertain attempt. A delayed signed webhook can also recover an unassociated session using its verified provider metadata and snapshot checks.
+
+A reservation with no recorded provider attempt can be released after expiry. Once an attempt exists, only verified expired/unpaid sessions release slots; open, processing, unreachable or mismatched sessions retain the hold. Pressing Back or returning from Checkout does not cancel a payment or free a slot. Confirmed-booking cancellation and refunds are not implemented in this slice.

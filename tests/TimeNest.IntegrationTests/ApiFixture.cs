@@ -29,7 +29,7 @@ public sealed class ApiFixture : IAsyncLifetime
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["ConnectionStrings:TimeNest"] = database.GetConnectionString(), ["Stripe:SecretKey"] = "sk_test_local_stub_only" }));
+                new Dictionary<string, string?> { ["ConnectionStrings:TimeNest"] = database.GetConnectionString(), ["Stripe:SecretKey"] = "sk_test_local_stub_only", ["Stripe:WebhookSecret"] = "whsec_local_stub_only" }));
             builder.ConfigureServices(services =>
             {
                 services.AddHttpClient("stripe").ConfigurePrimaryHttpMessageHandler(() => Stripe);

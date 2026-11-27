@@ -7,7 +7,7 @@ using TimeNest.Api.Features.Payments;
 namespace TimeNest.IntegrationTests;
 
 // Exercises the real Stripe SDK serialization through HTTP, without credentials or external calls.
-public sealed class StripeStub : HttpMessageHandler
+public sealed partial class StripeStub : HttpMessageHandler
 {
     public ConcurrentDictionary<string, string> AccountsByKey { get; } = new();
     public ConcurrentDictionary<string, ConnectedAccount> Accounts { get; } = new();
@@ -23,6 +23,7 @@ public sealed class StripeStub : HttpMessageHandler
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
         var key = request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null;
         Requests.Enqueue((path, body, key));
+        if (Checkout(path, request.Method, body, key) is { } checkout) return checkout;
         if (path == "/v2/core/accounts" && request.Method == HttpMethod.Post)
         {
             var id = AccountsByKey.GetOrAdd(key!, _ => "acct_" + Guid.NewGuid().ToString("N"));

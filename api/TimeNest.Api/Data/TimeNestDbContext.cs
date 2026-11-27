@@ -10,6 +10,7 @@ namespace TimeNest.Api.Data;
 
 public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> options) : IdentityDbContext<IdentityUser>(options)
 {
+    public DbSet<CheckoutPayment> CheckoutPayments => Set<CheckoutPayment>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<StripeConnection> StripeConnections => Set<StripeConnection>();
     public DbSet<Business> Businesses => Set<Business>();
@@ -19,6 +20,17 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<CheckoutPayment>(entity =>
+        {
+            entity.HasKey(x => x.BookingId);
+            entity.Property(x => x.PublicOrigin).HasMaxLength(2048);
+            entity.Property(x => x.SessionId).HasMaxLength(255);
+            entity.Property(x => x.PaymentIntentId).HasMaxLength(255);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            entity.HasIndex(x => x.SessionId).IsUnique();
+            entity.HasIndex(x => x.PaymentIntentId).IsUnique();
+            entity.HasOne<Booking>().WithOne().HasForeignKey<CheckoutPayment>(x => x.BookingId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<Booking>(entity =>
         {
             entity.Property(x => x.Version).IsRowVersion();
