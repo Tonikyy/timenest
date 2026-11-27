@@ -153,3 +153,16 @@ A reservation with no recorded provider attempt can be released after expiry. On
 ### Customer payment verification (2026-11-27)
 
 A real local browser run used a verified fictional customer to discover and reserve a payable demo opening, continue to Stripe-hosted sandbox Checkout, pay EUR 45 with Stripe's test Visa, and return to a server-verified Confirmed booking. The server checked the EUR 5 application fee and connected-account recipient. No live payment was made. Webhook signature/duplicate/order/failure behavior was verified in SQL Server integration tests; real Stripe webhook forwarding was not configured for this run. The customer return refresh performed the real reconciliation. Cancellation/refunds, real-provider declines/3DS and a real timed Checkout expiry remain unverified here.
+## Cancellation and refund recovery
+
+New reservations snapshot the last-minute policy: customer cancellation before the start does not automatically refund payment. Business cancellation refunds the complete amount, including the fee. The cancellation migration assigns the original policy to existing bookings. Customer and business mutations require ownership and CSRF.
+
+POST /api/bookings/{id}/cancel cancels a confirmed booking. POST /api/bookings/{id}/abandon requests cancellation of an unpaid hold; it does not cancel a payment that won the race. GET /api/business/bookings and /{id} show owned bookings; POST /{id}/cancel closes the appointment and queues its refund.
+
+Refunds are processed every 30 seconds when the sandbox key is configured. Forward refund.created, refund.updated and refund.failed as well as the existing checkout.session events to /api/payments/stripe/webhook, using the signing secret for that endpoint. The webhook retrieves current provider state and checks booking metadata, PaymentIntent, amount, currency and destination-transfer reversal before accepting success. The polling worker provides recovery when a callback is missed, including checks of recent successes for 35 days because bank failures can arrive later.
+
+Queued means the obligation is recorded; Pending means Stripe has not completed it. Succeeded means Stripe reports successful processing, not a promise that the customer bank has already posted the credit. Failed and RecoveryRequired need operator attention. Cancellation remains recorded regardless of refund progress. No provider error body, payment URL or secret is logged.
+
+The create request uses one persisted attempt and stable key. An unknown attempt older than 23 hours is never blindly recreated. Inspect the sandbox payment and its refunds in Stripe: compare the exact PaymentIntent, booking metadata, EUR amount and transfer/fee reversal. If the existing refund is found, resend its signed refund.created or refund.updated event to recover the association. Never clear the attempt or invent a new key to bypass ambiguity. Failed refunds and manual replacements require an explicit recovery decision preserving the old history; this demo does not provide an operator retry UI or automated replacement refund. Keep unresolved obligations visible.
+
+Stripe can hold card refunds pending when the available balance is insufficient; cancellation must not label these completed. For local failure and race coverage, run dotnet test against the SQL Server test container. No live payments are enabled.

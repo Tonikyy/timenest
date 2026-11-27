@@ -34,6 +34,9 @@ builder.Services.AddScoped<Reservations>();
 builder.Services.AddScoped<Cancellations>();
 builder.Services.AddScoped<BookingViews>();
 builder.Services.AddScoped<CheckoutService>();
+builder.Services.AddScoped<RefundService>();
+builder.Services.AddScoped<IStripeRefundGateway, StripeRefundGateway>();
+if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<RefundReconciler>();
 builder.Services.AddScoped<IStripeCheckoutGateway, StripeCheckoutGateway>();
 if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<CheckoutReconciler>();
 builder.Services.AddRateLimiter(options => options.AddPolicy("checkout", context =>
