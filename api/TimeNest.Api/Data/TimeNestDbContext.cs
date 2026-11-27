@@ -31,6 +31,8 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
         {
             entity.HasKey(x => x.BusinessId);
             entity.Property(x => x.AccountId).HasMaxLength(255);
+            entity.Property(x => x.ContactEmail).HasMaxLength(254);
+            entity.Property(x => x.CreationApiVersion).HasDefaultValue(1);
             entity.HasIndex(x => x.AccountId).IsUnique();
             entity.HasOne<Business>().WithOne().HasForeignKey<StripeConnection>(x => x.BusinessId)
                 .OnDelete(DeleteBehavior.Restrict);

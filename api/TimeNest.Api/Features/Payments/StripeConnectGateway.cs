@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Stripe;
+using V2 = Stripe.V2.Core;
 
 namespace TimeNest.Api.Features.Payments;
 
@@ -11,7 +12,7 @@ public sealed record ConnectedAccount(string Id, bool DetailsSubmitted, bool Cha
 
 public interface IStripeConnectGateway
 {
-    Task<string> CreateAccount(Guid businessId, CancellationToken cancellationToken);
+    Task<string> CreateAccount(Guid businessId, string contactEmail, CancellationToken cancellationToken);
     Task<ConnectedAccount> GetAccount(string accountId, CancellationToken cancellationToken);
     Task<string> CreateOnboardingLink(string accountId, CancellationToken cancellationToken);
 }
@@ -26,24 +27,44 @@ public sealed class StripeConnectGateway(IOptions<StripeConnectOptions> options,
     private StripeClient Client() => new(settings.SecretKey,
         httpClient: new SystemNetHttpClient(httpClients.CreateClient("stripe"), maxNetworkRetries: 2));
 
-    public Task<string> CreateAccount(Guid businessId, CancellationToken cancellationToken) => Call(async () =>
+    public Task<string> CreateAccount(Guid businessId, string contactEmail, CancellationToken cancellationToken) => Call(async () =>
     {
-        // Keep this payload stable across retries, even if the local profile is edited.
-        var account = await Client().V1.Accounts.CreateAsync(new AccountCreateOptions
+        // The email is snapshotted in SQL before the first request, so retries keep the same payload.
+        var account = await Client().V2.Core.Accounts.CreateAsync(new V2.AccountCreateOptions
         {
-            Type = "express", Country = "FI", DefaultCurrency = "eur",
-            Capabilities = new AccountCapabilitiesOptions
+            ContactEmail = contactEmail,
+            Dashboard = "express",
+            Identity = new V2.AccountCreateIdentityOptions { Country = "FI" },
+            Defaults = new V2.AccountCreateDefaultsOptions
             {
-                CardPayments = new AccountCapabilitiesCardPaymentsOptions { Requested = true },
-                Transfers = new AccountCapabilitiesTransfersOptions { Requested = true }
+                Currency = "eur",
+                Responsibilities = new V2.AccountCreateDefaultsResponsibilitiesOptions
+                { FeesCollector = "application", LossesCollector = "application" }
+            },
+            Configuration = new V2.AccountCreateConfigurationOptions
+            {
+                Merchant = new V2.AccountCreateConfigurationMerchantOptions
+                {
+                    Capabilities = new V2.AccountCreateConfigurationMerchantCapabilitiesOptions
+                    { CardPayments = new V2.AccountCreateConfigurationMerchantCapabilitiesCardPaymentsOptions { Requested = true } }
+                },
+                Recipient = new V2.AccountCreateConfigurationRecipientOptions
+                {
+                    Capabilities = new V2.AccountCreateConfigurationRecipientCapabilitiesOptions
+                    {
+                        StripeBalance = new V2.AccountCreateConfigurationRecipientCapabilitiesStripeBalanceOptions
+                        { StripeTransfers = new V2.AccountCreateConfigurationRecipientCapabilitiesStripeBalanceStripeTransfersOptions { Requested = true } }
+                    }
+                }
             },
             Metadata = new Dictionary<string, string> { ["timenest_business_id"] = businessId.ToString("N") }
-        }, new RequestOptions { IdempotencyKey = $"timenest-connect-v1-{businessId:N}" }, cancellationToken);
+        }, new RequestOptions { IdempotencyKey = $"timenest-connect-v2-{businessId:N}" }, cancellationToken);
         return account.Id;
     }, cancellationToken);
 
     public Task<ConnectedAccount> GetAccount(string accountId, CancellationToken cancellationToken) => Call(async () =>
     {
+        // Stripe supports retrieving v2 accounts through v1; preserve the existing readiness contract.
         var account = await Client().V1.Accounts.GetAsync(accountId, cancellationToken: cancellationToken);
         if (account.Deleted == true || account.Id != accountId) throw new StripeConnectUnavailableException();
         return new ConnectedAccount(account.Id, account.DetailsSubmitted, account.ChargesEnabled,

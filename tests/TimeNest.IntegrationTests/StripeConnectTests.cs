@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -77,16 +78,22 @@ public sealed class StripeConnectTests(ApiFixture fixture)
         var responses = await Task.WhenAll(first.Post(LinkPath, new { }), second.Post(LinkPath, new { }));
         Assert.All(responses, response => response.EnsureSuccessStatusCode());
         var business = (await first.Http.GetFromJsonAsync<BusinessProfileResponse>("/api/business"))!;
-        var requests = fixture.Stripe.Requests.Where(x => x.Path == "/v1/accounts" && x.Key == $"timenest-connect-v1-{business.Id:N}").ToArray();
+        var requests = fixture.Stripe.Requests.Where(x => x.Path == "/v2/core/accounts" && x.Key == $"timenest-connect-v2-{business.Id:N}").ToArray();
         Assert.NotEmpty(requests);
         Assert.Single(requests.Select(x => x.Body).Distinct());
-        var fields = QueryHelpers.ParseQuery(requests[0].Body);
-        Assert.Equal("FI", fields["country"]);
-        Assert.Equal("eur", fields["default_currency"]);
-        Assert.Equal("express", fields["type"]);
-        Assert.Equal("true", fields["capabilities[transfers][requested]"]);
-        Assert.Equal("true", fields["capabilities[card_payments][requested]"]);
-        Assert.Equal(business.Id.ToString("N"), fields["metadata[timenest_business_id]"]);
+        using var payload = JsonDocument.Parse(requests[0].Body);
+        var fields = payload.RootElement;
+        Assert.Equal("FI", fields.GetProperty("identity").GetProperty("country").GetString());
+        Assert.Equal("eur", fields.GetProperty("defaults").GetProperty("currency").GetString());
+        Assert.Equal("application", fields.GetProperty("defaults").GetProperty("responsibilities").GetProperty("fees_collector").GetString());
+        Assert.Equal("application", fields.GetProperty("defaults").GetProperty("responsibilities").GetProperty("losses_collector").GetString());
+        Assert.Equal("express", fields.GetProperty("dashboard").GetString());
+        Assert.Equal(first.Email, fields.GetProperty("contact_email").GetString());
+        Assert.True(fields.GetProperty("configuration").GetProperty("recipient").GetProperty("capabilities")
+            .GetProperty("stripe_balance").GetProperty("stripe_transfers").GetProperty("requested").GetBoolean());
+        Assert.True(fields.GetProperty("configuration").GetProperty("merchant").GetProperty("capabilities")
+            .GetProperty("card_payments").GetProperty("requested").GetBoolean());
+        Assert.Equal(business.Id.ToString("N"), fields.GetProperty("metadata").GetProperty("timenest_business_id").GetString());
         var id = await StoredAccount(first);
         (await first.Post(LinkPath, new { })).EnsureSuccessStatusCode();
         Assert.Equal(id, await StoredAccount(first));
@@ -107,7 +114,7 @@ public sealed class StripeConnectTests(ApiFixture fixture)
         }
         finally { fixture.Stripe.FailAfterCreation = false; }
         var business = (await owner.Http.GetFromJsonAsync<BusinessProfileResponse>("/api/business"))!;
-        var providerId = fixture.Stripe.AccountsByKey[$"timenest-connect-v1-{business.Id:N}"];
+        var providerId = fixture.Stripe.AccountsByKey[$"timenest-connect-v2-{business.Id:N}"];
         (await owner.Post(LinkPath, new { })).EnsureSuccessStatusCode();
         Assert.Equal(providerId, await StoredAccount(owner));
     }
@@ -120,10 +127,10 @@ public sealed class StripeConnectTests(ApiFixture fixture)
         try { Assert.Equal(HttpStatusCode.ServiceUnavailable, (await owner.Post(LinkPath, new { })).StatusCode); }
         finally { fixture.Stripe.FailLinks = false; }
         var id = await StoredAccount(owner);
-        var creationCount = fixture.Stripe.Requests.Count(x => x.Path == "/v1/accounts");
+        var creationCount = fixture.Stripe.Requests.Count(x => x.Path == "/v2/core/accounts");
         (await owner.Post(LinkPath, new { })).EnsureSuccessStatusCode();
         Assert.Equal(id, await StoredAccount(owner));
-        Assert.Equal(creationCount, fixture.Stripe.Requests.Count(x => x.Path == "/v1/accounts"));
+        Assert.Equal(creationCount, fixture.Stripe.Requests.Count(x => x.Path == "/v2/core/accounts"));
     }
 
     [Fact]
@@ -133,7 +140,7 @@ public sealed class StripeConnectTests(ApiFixture fixture)
         var business = (await owner.Http.GetFromJsonAsync<BusinessProfileResponse>("/api/business"))!;
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<TimeNestDbContext>();
-        db.StripeConnections.Add(new StripeConnection { BusinessId = business.Id, CreationStartedAt = ApiFixture.Now.AddHours(-23) });
+        db.StripeConnections.Add(new StripeConnection { BusinessId = business.Id, CreationStartedAt = ApiFixture.Now.AddDays(-29), ContactEmail = owner.Email });
         await db.SaveChangesAsync();
         var requestCount = fixture.Stripe.Requests.Count;
         Assert.Equal("recoveryRequired", (await Status(owner)).State);
@@ -182,6 +189,58 @@ public sealed class StripeConnectTests(ApiFixture fixture)
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.Post(LinkPath, new { })).StatusCode);
         Assert.Equal(count, fixture.Stripe.Requests.Count);
         Assert.Equal("notStarted", (await Status(owner)).State);
+    }
+    [Fact]
+    public async Task Pending_v1_creation_is_not_reissued_through_a_different_API()
+    {
+        using var owner = await Owner();
+        var business = (await owner.Http.GetFromJsonAsync<BusinessProfileResponse>("/api/business"))!;
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TimeNestDbContext>();
+        db.StripeConnections.Add(new StripeConnection
+        { BusinessId = business.Id, CreationStartedAt = ApiFixture.Now, CreationApiVersion = 1 });
+        await db.SaveChangesAsync();
+        var count = fixture.Stripe.Requests.Count;
+        Assert.Equal("recoveryRequired", (await Status(owner)).State);
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.Post(LinkPath, new { })).StatusCode);
+        Assert.Equal(count, fixture.Stripe.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Existing_v1_account_can_still_get_status_and_onboarding_links()
+    {
+        using var owner = await Owner();
+        var business = (await owner.Http.GetFromJsonAsync<BusinessProfileResponse>("/api/business"))!;
+        var id = "acct_" + Guid.NewGuid().ToString("N");
+        fixture.Stripe.Accounts[id] = new ConnectedAccount(id, false, false, false, false);
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TimeNestDbContext>();
+        db.StripeConnections.Add(new StripeConnection
+        { BusinessId = business.Id, CreationStartedAt = ApiFixture.Now.AddYears(-1), CreationApiVersion = 1, AccountId = id });
+        await db.SaveChangesAsync();
+        var count = fixture.Stripe.Requests.Count(x => x.Path == "/v2/core/accounts");
+        Assert.Equal("incomplete", (await Status(owner)).State);
+        (await owner.Post(LinkPath, new { })).EnsureSuccessStatusCode();
+        Assert.Equal(count, fixture.Stripe.Requests.Count(x => x.Path == "/v2/core/accounts"));
+    }
+
+    [Fact]
+    public async Task Retry_uses_the_persisted_email_even_if_the_user_email_changes()
+    {
+        using var owner = await Owner();
+        fixture.Stripe.FailAfterCreation = true;
+        try { Assert.Equal(HttpStatusCode.ServiceUnavailable, (await owner.Post(LinkPath, new { })).StatusCode); }
+        finally { fixture.Stripe.FailAfterCreation = false; }
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TimeNestDbContext>();
+        await db.Users.Where(x => x.Email == owner.Email).ExecuteUpdateAsync(s => s.SetProperty(x => x.Email, "changed@example.test"));
+        (await owner.Post(LinkPath, new { contactEmail = "attacker@example.test" })).EnsureSuccessStatusCode();
+        var business = (await owner.Http.GetFromJsonAsync<BusinessProfileResponse>("/api/business"))!;
+        var attempts = fixture.Stripe.Requests.Where(x => x.Key == $"timenest-connect-v2-{business.Id:N}").ToArray();
+        Assert.True(attempts.Length >= 2);
+        Assert.Single(attempts.Select(x => x.Body).Distinct());
+        using var json = JsonDocument.Parse(attempts.Last().Body);
+        Assert.Equal(owner.Email, json.RootElement.GetProperty("contact_email").GetString());
     }
     private static async Task<OnboardingStatus> Status(AccountClient owner) =>
         (await owner.Http.GetFromJsonAsync<OnboardingStatus>(Path))!;
