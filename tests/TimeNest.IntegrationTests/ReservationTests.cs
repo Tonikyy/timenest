@@ -1,3 +1,5 @@
+using System.Data.Common;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,6 +56,52 @@ public sealed class ReservationTests(ApiFixture fixture)
         var db = scope.ServiceProvider.GetRequiredService<TimeNestDbContext>();
         Assert.Equal(1, await db.Bookings.CountAsync(x => x.VacancyId == first.SlotId && x.IsActive));
         Assert.Equal(VacancyStatus.Held, (await db.Vacancies.FindAsync(first.SlotId))!.Status);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Booking_committed_before_vacancy_read_is_reused_only_by_its_customer(bool sameCustomer)
+    {
+        var seed = await Seed(fixture);
+        var competingCustomer = sameCustomer ? seed.CustomerId : (await Seed(fixture)).CustomerId;
+        Booking? winner = null;
+        var interleaving = new CommitBeforeVacancyRead(async () => winner = await Reserve(seed.SlotId, competingCustomer));
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var options = new DbContextOptionsBuilder<TimeNestDbContext>(
+            scope.ServiceProvider.GetRequiredService<DbContextOptions<TimeNestDbContext>>())
+            .AddInterceptors(interleaving).Options;
+        await using var db = new TimeNestDbContext(options);
+        var reservations = new Reservations(db, scope.ServiceProvider.GetRequiredService<TimeProvider>());
+
+        if (sameCustomer)
+        {
+            var result = await reservations.Reserve(seed.SlotId, seed.CustomerId, 500, default);
+            Assert.Equal(winner!.Id, result.Id);
+        }
+        else
+            await Assert.ThrowsAsync<BookingConflictException>(() => reservations.Reserve(seed.SlotId, seed.CustomerId, 500, default));
+
+        Assert.True(interleaving.Committed);
+        Assert.Equal(1, await db.Bookings.CountAsync(x => x.VacancyId == seed.SlotId && x.IsActive));
+        Assert.Equal(VacancyStatus.Held, (await db.Vacancies.AsNoTracking().SingleAsync(x => x.Id == seed.SlotId)).Status);
+    }
+
+    private sealed class CommitBeforeVacancyRead(Func<Task> commit) : DbCommandInterceptor
+    {
+        public bool Committed { get; private set; }
+
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!Committed && command.CommandText.Contains("FROM [Vacancies]"))
+            {
+                Committed = true;
+                await commit();
+            }
+            return result;
+        }
     }
 
     [Fact]

@@ -26,7 +26,13 @@ public sealed class Reservations(TimeNestDbContext database, TimeProvider clock)
         var slot = await database.Vacancies.Include(x => x.Business).SingleOrDefaultAsync(x => x.Id == vacancyId, ct);
         var now = clock.GetUtcNow();
         if (slot is null || slot.Status != VacancyStatus.Available || slot.StartsAt <= now.AddMinutes(40))
+        {
+            // A concurrent request may have committed after the initial booking read.
+            var winner = await database.Bookings.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.VacancyId == vacancyId && x.IsActive && x.CustomerId == customerId, ct);
+            if (winner is not null) return winner;
             throw new BookingConflictException("unavailable");
+        }
         if (!slot.Business.IsDemo || slot.Business.OwnerId == customerId)
             throw new BookingConflictException("notBookable");
         if (feeCents < 0 || slot.PriceCents <= feeCents || slot.PriceCents < 50)
