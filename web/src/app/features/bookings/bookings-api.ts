@@ -1,6 +1,6 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { switchMap } from 'rxjs';
+import { switchMap, throwError } from 'rxjs';
 import { Session } from '../../core/session';
 
 export interface Booking {
@@ -27,6 +27,8 @@ export interface BookingPage {
   pageSize: number;
 }
 
+const bookingIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable({ providedIn: 'root' })
 export class BookingsApi {
   private readonly http = inject(HttpClient);
@@ -35,6 +37,7 @@ export class BookingsApi {
     return this.http.get<BookingPage>('/api/bookings', { params: { page } });
   }
   get(id: string) {
+    if (!bookingIdPattern.test(id)) return throwError(() => new HttpErrorResponse({ status: 404 }));
     return this.http.get<Booking>('/api/bookings/' + id);
   }
   reserve(vacancyId: string) {
@@ -43,6 +46,7 @@ export class BookingsApi {
       .pipe(switchMap(() => this.http.post<{ id: string }>('/api/bookings', { vacancyId })));
   }
   checkout(id: string) {
+    if (!bookingIdPattern.test(id)) return throwError(() => new HttpErrorResponse({ status: 404 }));
     return this.session
       .csrf()
       .pipe(
@@ -52,6 +56,7 @@ export class BookingsApi {
       );
   }
   refresh(id: string) {
+    if (!bookingIdPattern.test(id)) return throwError(() => new HttpErrorResponse({ status: 404 }));
     return this.session
       .csrf()
       .pipe(switchMap(() => this.http.post<Booking>('/api/bookings/' + id + '/refresh', {})));
