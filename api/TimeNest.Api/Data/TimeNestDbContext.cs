@@ -1,3 +1,4 @@
+using TimeNest.Api.Features.Bookings;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ namespace TimeNest.Api.Data;
 
 public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> options) : IdentityDbContext<IdentityUser>(options)
 {
+    public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<StripeConnection> StripeConnections => Set<StripeConnection>();
     public DbSet<Business> Businesses => Set<Business>();
     public DbSet<ServiceType> ServiceTypes => Set<ServiceType>();
@@ -17,6 +19,28 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<Booking>(entity =>
+        {
+            entity.Property(x => x.Version).IsRowVersion();
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Title).HasMaxLength(160);
+            entity.Property(x => x.BusinessName).HasMaxLength(160);
+            entity.Property(x => x.Address).HasMaxLength(240);
+            entity.Property(x => x.City).HasMaxLength(100);
+            entity.Property(x => x.ServiceTypeId).HasMaxLength(40);
+            entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.Property(x => x.RecipientAccountId).HasMaxLength(255);
+            entity.HasIndex(x => x.VacancyId).IsUnique().HasFilter("[IsActive] = 1");
+            entity.HasIndex(x => new { x.CustomerId, x.CreatedAt });
+            entity.HasOne<Vacancy>().WithMany().HasForeignKey(x => x.VacancyId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<IdentityUser>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint("CK_Bookings_PriceFee", "[PriceCents] >= 50 AND [FeeCents] >= 0 AND [FeeCents] < [PriceCents]");
+                table.HasCheckConstraint("CK_Bookings_Active", "([Status] IN ('Pending', 'Confirmed') AND [IsActive] = 1) OR ([Status] = 'Expired' AND [IsActive] = 0)");
+            });
+        });
         modelBuilder.Entity<Business>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(160);
