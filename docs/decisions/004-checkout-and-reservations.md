@@ -12,7 +12,7 @@ SQL Server enforces one active reservation/booking per slot using a filtered uni
 
 A timer never proves payment is impossible. Once a Checkout attempt is recorded, keep the hold until Stripe confirms the session expired and unpaid, or confirms payment. Unknown outcomes remain held for reconciliation. Never recreate a session after its idempotency window; preserve all booking and payment history.
 
-The reservation foundation provides persistence and an internal service only. The dependent payment PR adds public endpoints, provider verification and reconciliation; the customer UI follows separately.
+The reservation foundation provides persistence and an internal service. The dependent payment PR adds customer-owned endpoints, signed platform webhooks and a periodic reconciler. All payment confirmation paths retrieve authoritative session/PaymentIntent state and share database-locked terminal transitions. The customer UI follows separately.
 
 ## Sources
 

@@ -1,3 +1,4 @@
+using TimeNest.Api.Features.Bookings;
 using TimeNest.Api.Features.Accounts;
 using TimeNest.Api.Features.Payments;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -29,6 +30,15 @@ builder.Services.AddRateLimiter(options => options.AddPolicy("stripe-connect", c
         context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
         _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
         { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+builder.Services.AddScoped<Reservations>();
+builder.Services.AddScoped<CheckoutService>();
+builder.Services.AddScoped<IStripeCheckoutGateway, StripeCheckoutGateway>();
+if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<CheckoutReconciler>();
+builder.Services.AddRateLimiter(options => options.AddPolicy("checkout", context =>
+    System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 var app = builder.Build();
 if (args.Contains("--migrate") || args.Contains("--seed-demo"))
 {
