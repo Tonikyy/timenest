@@ -1,3 +1,4 @@
+import { BookingsPage } from './features/bookings/bookings';
 import { Routes } from '@angular/router';
 import { PaymentsPage } from './features/business/payments';
 import { PublishingPage } from './features/business/publishing';
@@ -7,6 +8,8 @@ import { AccountPage } from './features/account/account';
 
 export const routes: Routes = [
   { path: '', component: Discovery },
+  { path: 'bookings', component: BookingsPage },
+  { path: 'bookings/:id', component: BookingsPage },
   { path: 'account', component: AccountPage, data: { mode: 'home' } },
   { path: 'account/login', component: AccountPage, data: { mode: 'login' } },
   { path: 'account/register', component: AccountPage, data: { mode: 'register' } },

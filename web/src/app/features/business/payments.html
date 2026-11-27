@@ -13,7 +13,7 @@
   </p>
   <p>
     Stripe kerää maksujen ja tilitysten tarvitsemat tiedot omalla sivullaan. Esittelyaikojen
-    julkaiseminen toimii jo nyt. Asiakkaiden varaaminen ja maksaminen tulevat myöhemmin.
+    julkaiseminen toimii jo nyt. Maksuvalmiit esittelyajat voi varata testimaksulla.
   </p>
   @if (arrival === 'refresh') {
     <p>
@@ -71,8 +71,8 @@
         @case ('ready') {
           <h2 id="onboarding-state">Stripe-käyttöönotto on valmis esittelyyn</h2>
           <p>
-            Stripe on vahvistanut tarvittavat valmiudet. Asiakasvaraukset ja maksut eivät ole vielä
-            käytössä.
+            Stripe on vahvistanut tarvittavat valmiudet. Asiakkaat voivat nyt kokeilla
+            esittelyaikojen varaamista ja testimaksuja.
           </p>
         }
       }

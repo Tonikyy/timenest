@@ -1,3 +1,6 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { BookingsApi } from '../bookings/bookings-api';
 import { Component, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -26,6 +29,11 @@ const distance = new Intl.NumberFormat('fi-FI', { maximumFractionDigits: 1 });
 })
 export class Discovery {
   private readonly api = inject(DiscoveryApi);
+  private readonly bookings = inject(BookingsApi);
+  private readonly router = inject(Router);
+  readonly reserving = signal(false);
+  readonly bookingError = signal('');
+  readonly signedOut = signal(false);
   private readonly destroyRef = inject(DestroyRef);
   private readonly requests = new Subject<SearchQuery>();
   private submittedQuery: SearchQuery | null = null;
@@ -159,7 +167,52 @@ export class Discovery {
     );
   }
 
+  reserve() {
+    const slot = this.selected();
+    if (!slot || this.reserving()) return;
+    this.reserving.set(true);
+    this.bookingError.set('');
+    this.signedOut.set(false);
+    this.bookings
+      .reserve(slot.id)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.reserving.set(false)),
+      )
+      .subscribe({
+        next: ({ id }) => {
+          this.closeDetails();
+          void this.router.navigate(['/bookings', id]);
+        },
+        error: (error: HttpErrorResponse) => {
+          this.signedOut.set(error.status === 401);
+          if (error.status === 401)
+            this.bookingError.set('Kirjaudu sisään varataksesi esittelyajan.');
+          else if (error.error?.code === 'paymentsUnavailable')
+            this.bookingError.set(
+              'Tämän yrityksen testimaksut eivät ole vielä käytössä. Valitse toinen aika.',
+            );
+          else if (error.error?.code === 'priceTooLow')
+            this.bookingError.set(
+              'Tämän ajan hintaa ei voi maksaa palvelussa. Valitse toinen aika.',
+            );
+          else if (error.error?.code === 'notBookable')
+            this.bookingError.set('Et voi varata oman yrityksesi aikaa.');
+          else if (error.status === 409)
+            this.bookingError.set(
+              'Aika ei ole enää varattavissa tai se alkaa alle 40 minuutin kuluttua. Päivitä haku ja valitse toinen aika.',
+            );
+          else
+            this.bookingError.set(
+              'Varausta ei voitu varmistaa. Tarkista Omat varaukset ennen uutta yritystä.',
+            );
+        },
+      });
+  }
+
   openDetails(slot: Vacancy) {
+    this.bookingError.set('');
+    this.signedOut.set(false);
     this.selected.set(slot);
     this.details().nativeElement.showModal();
   }

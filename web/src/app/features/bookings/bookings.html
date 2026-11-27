@@ -1,0 +1,105 @@
+<main class="workspace narrow">
+  <a routerLink="/" aria-label="TimeNest - etusivu"
+    ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
+  /></a>
+  <nav class="workspace-nav" aria-label="Asiakkaan valikko">
+    <a routerLink="/">Löydä aika</a><a routerLink="/bookings">Omat varaukset</a
+    ><a routerLink="/account">Oma tili</a>
+  </nav>
+  <h1>{{ id ? 'Oma hetkesi' : 'Omat varaukset' }}</h1>
+  <p class="form-success">
+    Esittelytila · Vain kuvitteellisia palveluja ja testimaksuja. Oikeaa rahaa ei liiku.
+  </p>
+  @if (arrival === 'return' || arrival === 'cancel') {
+    <p>
+      Palasit maksusivulta. Varaus vahvistuu vasta, kun maksu on tarkistettu. Paluu ei peruuta
+      maksua.
+    </p>
+  }
+  @if (busy()) {
+    <p role="status">Tarkistetaan varausta…</p>
+  }
+  @if (error()) {
+    <p class="form-error" role="alert">{{ error() }}</p>
+  }
+  @if (signedOut()) {
+    <a routerLink="/account/login">Kirjaudu sisään</a>
+  }
+  @if (booking(); as item) {
+    <article class="managed-slot" aria-labelledby="booking-title">
+      <p class="eyebrow">{{ item.businessName }}</p>
+      <h2 id="booking-title">{{ item.title }}</h2>
+      <p>{{ day(item.startsAt) }} klo {{ time(item.startsAt) }} · {{ item.durationMinutes }} min</p>
+      <p>{{ item.address }}, {{ item.city }}</p>
+      <p>
+        <strong>{{ price(item.priceCents) }}</strong> · Sisältää TimeNestin
+        {{ price(item.feeCents) }} palvelumaksun.
+      </p>
+      <h3 aria-live="polite">{{ label(item.status) }}</h3>
+      @if (item.status === 'Confirmed') {
+        <p class="form-success">Maksu on vahvistettu ja aika on varattu sinulle.</p>
+        <p>Esittelyversion peruutukset ja palautukset tulevat myöhemmin.</p>
+      } @else if (item.status === 'Expired') {
+        <p>Maksua ei vahvistettu ja varaus on päättynyt. Voit etsiä uuden vapaan ajan.</p>
+        <a routerLink="/">Etsi uusi aika</a>
+      } @else if (item.recoveryRequired) {
+        <p>
+          Maksun tilanne tarvitsee selvityksen. Ota yhteyttä TimeNestin ylläpitoon ennen uutta
+          varausta.
+        </p>
+      } @else {
+        <p>
+          Aloita maksu viimeistään {{ day(item.checkoutStartBefore) }} klo
+          {{ time(item.checkoutStartBefore) }}. Maksuaika päättyy {{ day(item.holdExpiresAt) }} klo
+          {{ time(item.holdExpiresAt) }} (Suomen aikaa).
+        </p>
+        <p>
+          Jos olet jo maksanut, tarkista tila. Keskeneräistä maksua ei tulkita automaattisesti
+          peruutukseksi.
+        </p>
+        <button class="primary-button" type="button" (click)="pay()" [disabled]="busy()">
+          Jatka maksamaan
+        </button>
+      }
+    </article>
+  }
+  @if (result(); as page) {
+    @for (item of page.items; track item.id) {
+      <article class="managed-slot">
+        <h2>
+          <a [routerLink]="['/bookings', item.id]">{{ item.title }}</a>
+        </h2>
+        <p>{{ item.businessName }} · {{ day(item.startsAt) }} klo {{ time(item.startsAt) }}</p>
+        <p>{{ price(item.priceCents) }} · {{ label(item.status) }}</p>
+      </article>
+    } @empty {
+      <p>Sinulla ei ole vielä varauksia.</p>
+      <a routerLink="/">Löydä oma hetkesi</a>
+    }
+    @if (page.total > page.pageSize) {
+      <nav class="workspace-nav" aria-label="Varausten sivut">
+        <button
+          type="button"
+          class="secondary-button"
+          (click)="load(false, page.page - 1)"
+          [disabled]="busy() || page.page === 1"
+        >
+          Edellinen
+        </button>
+        <span>Sivu {{ page.page }}</span>
+        <button
+          type="button"
+          class="secondary-button"
+          (click)="load(false, page.page + 1)"
+          [disabled]="busy() || page.page * page.pageSize >= page.total"
+        >
+          Seuraava
+        </button>
+      </nav>
+    }
+  }
+  <button class="secondary-button" type="button" (click)="load(!!id)" [disabled]="busy()">
+    Tarkista tila
+  </button>
+  <p>Kaikki ajat näytetään Suomen ajassa.</p>
+</main>
