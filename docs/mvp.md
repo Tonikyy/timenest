@@ -17,14 +17,14 @@ Start with one owner and one location per business, Finnish UI, EUR, and appoint
 
 Include account registration, verification, recovery, nearby search, service/date filtering, booking ownership, cancellation, payment/refund recovery, and responsive customer/business screens.
 
-## Proposed policies to finalize before payment implementation
+## Sandbox payment policies
 
-- Stripe Connect sandbox Express onboarding is implemented; hosted Checkout follows.
+- Stripe Connect sandbox Express onboarding and hosted card Checkout are implemented. A real sandbox customer payment reached a server-verified confirmed booking on 2026-11-27.
 - Fixed EUR 5 application fee deducted from the advertised price; make the fee configurable and snapshot it on each booking.
 - With destination charges, payment-provider costs come out of the platform's proceeds.
 - Full refund, including the platform fee, for customer cancellation before the start; full refund for business cancellation.
-- Choose and document a reservation duration together with the Checkout expiry implementation. Never release a hold based solely on a local timer while payment remains possible.
-- Enable only payment methods compatible with the short reservation lifecycle.
+- Reservations last 35 minutes; start Checkout within four minutes, for appointments more than 40 minutes away. Never release a hold based solely on a local timer while payment remains possible.
+- Only card payments are enabled. Confirmed-booking cancellation and refunds remain planned.
 
 These are demo policies, not finalized terms for a real-money pilot.
 

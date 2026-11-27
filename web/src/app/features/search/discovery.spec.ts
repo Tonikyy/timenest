@@ -1,7 +1,8 @@
+import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Discovery } from './discovery';
 
 describe('Discovery', () => {
@@ -10,7 +11,7 @@ describe('Discovery', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [Discovery],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     fixture = TestBed.createComponent(Discovery);
     http = TestBed.inject(HttpTestingController);
@@ -159,6 +160,68 @@ describe('Discovery', () => {
       expect(root.querySelectorAll('.vacancy-card')).toHaveLength(3);
       expect(root.querySelector('.message-state')).toBeNull();
       expect(root.querySelector('.pagination')).toBeNull();
+    },
+  );
+
+  it('reserves only the selected vacancy and blocks repeated clicks', async () => {
+    http.expectOne((req) => req.url === '/api/vacancies').flush(empty);
+    fixture.componentInstance.selected.set({
+      id: 'slot-1',
+      title: 'Demo',
+      description: 'Fictional',
+      serviceTypeId: 'hair',
+      serviceType: 'Hiukset',
+      businessName: 'Demo',
+      address: 'Test 1',
+      city: 'Helsinki',
+      startsAt: '2027-01-18T10:00:00Z',
+      durationMinutes: 45,
+      priceCents: 4500,
+      currency: 'EUR',
+      distanceKm: 0,
+      isDemo: true,
+    });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    vi.spyOn(fixture.componentInstance, 'closeDetails').mockImplementation(() => {});
+    fixture.componentInstance.reserve();
+    fixture.componentInstance.reserve();
+    http.expectOne('/api/account/csrf').flush(null);
+    const request = http.expectOne('/api/bookings');
+    expect(request.request.body).toEqual({ vacancyId: 'slot-1' });
+    request.flush({ id: 'booking-1' });
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(['/bookings', 'booking-1']);
+  });
+
+  it.each([401, 409])(
+    'explains reservation failure %s without pretending it succeeded',
+    async (status) => {
+      http.expectOne((req) => req.url === '/api/vacancies').flush(empty);
+      fixture.componentInstance.selected.set({
+        id: 'slot-1',
+        title: 'Demo',
+        description: 'Fictional',
+        serviceTypeId: 'hair',
+        serviceType: 'Hiukset',
+        businessName: 'Demo',
+        address: 'Test 1',
+        city: 'Helsinki',
+        startsAt: '2027-01-18T10:00:00Z',
+        durationMinutes: 45,
+        priceCents: 4500,
+        currency: 'EUR',
+        distanceKm: 0,
+        isDemo: true,
+      });
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      fixture.componentInstance.reserve();
+      http.expectOne('/api/account/csrf').flush(null);
+      http
+        .expectOne('/api/bookings')
+        .flush({ code: 'unavailable' }, { status, statusText: 'Rejected' });
+      expect(fixture.componentInstance.bookingError()).not.toBe('');
+      expect(fixture.componentInstance.signedOut()).toBe(status === 401);
+      expect(fixture.componentInstance.reserving()).toBe(false);
+      expect(navigate).not.toHaveBeenCalled();
     },
   );
 });

@@ -35,7 +35,8 @@
       ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
     /></a>
     <nav aria-label="Päävalikko">
-      <a href="#ajat" class="nav-active">Löydä aika</a><a href="#yrityksille">Yrityksille</a>
+      <a href="#ajat" class="nav-active">Löydä aika</a><a href="/bookings">Omat varaukset</a
+      ><a href="#yrityksille">Yrityksille</a>
     </nav>
     <a href="/account" class="account-link">Oma tili</a>
   </div>
@@ -141,8 +142,8 @@
       </p>
     }
     <p class="demo-notice">
-      Tutustu rauhassa. Esittelyn yritykset ja ajat ovat kuvitteellisia, eikä niihin voi vielä tehdä
-      varauksia tai maksuja.
+      Esittelyn yritykset ja ajat ovat kuvitteellisia. Maksuvalmiiden yritysten aikoja voi varata
+      testimaksulla.
     </p>
     <div class="results" [attr.aria-busy]="loading()">
       @if (loading()) {
@@ -244,8 +245,8 @@
           hetkeään etsivät asiakkaat yhteen.
         </p>
         <p class="business-note">
-          Luo yritysprofiili ja julkaise kuvitteellisia esittelyaikoja. Varaaminen ja maksaminen
-          ovat tulossa.
+          Luo yritysprofiili ja julkaise kuvitteellisia esittelyaikoja. Maksuvalmiit yritykset
+          voivat vastaanottaa testivarauksia.
         </p>
         <p class="business-note"><a href="/business/vacancies">Siirry yrityksen näkymään</a></p>
       </div>
@@ -297,8 +298,20 @@
           <dd>{{ price(slot.priceCents) }}</dd>
         </div>
       </dl>
+      @if (bookingError()) {
+        <p class="form-error" role="alert">{{ bookingError() }}</p>
+      }
+      @if (signedOut()) {
+        <p>
+          <a href="/account/login">Kirjaudu sisään</a> · <a href="/account/register">Luo tili</a>
+        </p>
+      }
+      <button class="primary-button" type="button" (click)="reserve()" [disabled]="reserving()">
+        {{ reserving() ? 'Varataan…' : 'Varaa esittelyaika' }}
+      </button>
+      <p><a href="/bookings">Omat varaukset</a></p>
       <p class="dialog-notice">
-        Tämä on kuvitteellinen esittelyaika. Varaaminen ja maksaminen eivät ole vielä käytössä.
+        Tämä on kuvitteellinen esittelyaika. Maksu tehdään testikortilla; oikeaa rahaa ei liiku.
       </p>
     }
   </div>
