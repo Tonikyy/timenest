@@ -15,7 +15,7 @@ The first runnable slice includes:
 - Health checks, SQL Server integration tests, frontend tests, and GitHub Actions.
 - Accounts with email verification, cookie login/logout and password recovery (local development email).
 
-Verified accounts can manage their demo business profile and publish, edit and cancel fictional openings. The Stripe sandbox onboarding API is available; its business screen follows in a separate PR. Bookings, payments, refunds and Azure deployment remain next. Bookings and payments are not enabled.
+Verified accounts can manage their demo business profile and publish, edit and cancel fictional openings. Owners can start/resume Stripe sandbox onboarding and check its status at /business/payments after local Stripe configuration. Bookings, payments, refunds and Azure deployment remain next. Bookings and payments are not enabled.
 
 ## Run locally
 

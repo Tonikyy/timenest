@@ -1,0 +1,115 @@
+<main class="workspace narrow">
+  <a routerLink="/" aria-label="TimeNest - etusivu"
+    ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
+  /></a>
+  <nav class="workspace-nav" aria-label="Yrityksen valikko">
+    <a routerLink="/business">Yritysprofiili</a>
+    <a routerLink="/business/vacancies">Omat ajat</a>
+    <a routerLink="/account">Oma tili</a>
+  </nav>
+  <h1>Maksujen käyttöönotto</h1>
+  <p class="form-success">
+    Esittelytila · Kokeile käyttöönottoa kuvitteellisen yrityksen tiedoilla. Oikeaa rahaa ei liiku.
+  </p>
+  <p>
+    Stripe kerää maksujen ja tilitysten tarvitsemat tiedot omalla sivullaan. Esittelyaikojen
+    julkaiseminen toimii jo nyt. Asiakkaiden varaaminen ja maksaminen tulevat myöhemmin.
+  </p>
+  @if (arrival === 'refresh') {
+    <p>
+      Edellinen Stripe-linkki on vanhentunut tai jo käytetty. Jatka alta saadaksesi uuden linkin.
+    </p>
+  } @else if (arrival === 'return') {
+    <p>
+      Palasit Stripestä. Tarkistamme käyttöönoton tilanteen erikseen; paluu ei vielä tarkoita, että
+      tiedot ovat valmiit.
+    </p>
+  }
+  @if (loading()) {
+    <p role="status">Tarkistetaan käyttöönoton tilaa.</p>
+  }
+  @if (error()) {
+    <p class="form-error" role="alert">{{ error() }}</p>
+  }
+  @if (signedOut()) {
+    <a routerLink="/account/login">Kirjaudu sisään</a>
+  }
+  @if (status(); as current) {
+    <section class="managed-slot" aria-labelledby="onboarding-state">
+      @switch (current.state) {
+        @case ('noBusiness') {
+          <h2 id="onboarding-state">Luo ensin yritysprofiili</h2>
+          <p>Käyttöönotto liitetään omaan esittely-yritykseesi.</p>
+          <a routerLink="/business">Luo yritysprofiili</a>
+        }
+        @case ('unavailable') {
+          <h2 id="onboarding-state">Maksujen kokeilu ei ole vielä käytettävissä</h2>
+          <p>Voit sillä välin luoda ja hallita esittelyaikoja.</p>
+          <a routerLink="/business/vacancies">Omat ajat</a>
+        }
+        @case ('notStarted') {
+          <h2 id="onboarding-state">Valmis aloittamaan?</h2>
+          <p>
+            Avaa Stripe ja täytä esittely-yrityksen tiedot. Voit keskeyttää ja jatkaa myöhemmin.
+          </p>
+        }
+        @case ('pendingCreation') {
+          <h2 id="onboarding-state">Aloitus jäi kesken</h2>
+          <p>Jatka käyttöönottoa. TimeNest jatkaa aiempaa aloitusta turvallisesti.</p>
+        }
+        @case ('recoveryRequired') {
+          <h2 id="onboarding-state">Aloitus tarvitsee selvityksen</h2>
+          <p>Ota yhteyttä TimeNestin ylläpitoon ennen kuin jatkat. Esittelyaikasi säilyvät.</p>
+        }
+        @case ('incomplete') {
+          <h2 id="onboarding-state">Käyttöönotto on kesken</h2>
+          <p>
+            Tietoja puuttuu tai Stripe tarkistaa niitä. Täydennä tiedot Stripessä tai tarkista tila
+            myöhemmin.
+          </p>
+        }
+        @case ('ready') {
+          <h2 id="onboarding-state">Stripe-käyttöönotto on valmis esittelyyn</h2>
+          <p>
+            Stripe on vahvistanut tarvittavat valmiudet. Asiakasvaraukset ja maksut eivät ole vielä
+            käytössä.
+          </p>
+        }
+      }
+      @if (current.state === 'ready' || current.state === 'incomplete') {
+        <ul aria-label="Käyttöönoton vaiheet">
+          <li>Tiedot lähetetty: {{ current.detailsSubmitted ? 'Kyllä' : 'Ei vielä' }}</li>
+          <li>Maksuvalmius: {{ current.chargesEnabled ? 'Valmis' : 'Kesken' }}</li>
+          <li>Siirtovalmius: {{ current.transfersActive ? 'Valmis' : 'Kesken' }}</li>
+          <li>Tilitysvalmius: {{ current.payoutsEnabled ? 'Valmis' : 'Kesken' }}</li>
+        </ul>
+      }
+    </section>
+  }
+  <div class="workspace-nav">
+    @if (canContinue()) {
+      <button
+        class="primary-button"
+        type="button"
+        (click)="start()"
+        [disabled]="starting() || loading()"
+      >
+        {{
+          starting()
+            ? 'Avataan Stripeä…'
+            : status()?.state === 'notStarted'
+              ? 'Aloita Stripessä'
+              : 'Jatka Stripessä'
+        }}
+      </button>
+    }
+    <button
+      class="secondary-button"
+      type="button"
+      (click)="load()"
+      [disabled]="loading() || starting()"
+    >
+      Tarkista tila
+    </button>
+  </div>
+</main>
