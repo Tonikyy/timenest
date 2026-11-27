@@ -1,4 +1,5 @@
 using TimeNest.Api.Features.Accounts;
+using TimeNest.Api.Features.Payments;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using TimeNest.Api.Data;
@@ -17,6 +18,17 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("sql-server", tags: ["ready"]);
 
 builder.Services.AddAccounts(builder.Environment);
+builder.Services.AddOptions<StripeConnectOptions>().BindConfiguration("Stripe")
+    .Validate(options => options.IsValid(builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing")),
+        "Stripe requires a sandbox secret key and a trusted HTTPS origin (local HTTP is allowed in development).")
+    .ValidateOnStart();
+builder.Services.AddHttpClient("stripe", client => client.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.AddScoped<IStripeConnectGateway, StripeConnectGateway>();
+builder.Services.AddRateLimiter(options => options.AddPolicy("stripe-connect", context =>
+    System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 var app = builder.Build();
 if (args.Contains("--migrate") || args.Contains("--seed-demo"))
 {
