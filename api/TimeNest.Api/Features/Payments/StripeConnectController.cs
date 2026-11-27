@@ -33,7 +33,7 @@ public sealed class StripeConnectController(TimeNestDbContext database, IStripeC
             .SingleOrDefaultAsync(x => x.BusinessId == business.Id, cancellationToken);
         if (connection is null) return Ok(new OnboardingStatus("notStarted"));
         if (connection.AccountId is null)
-            return Ok(new OnboardingStatus(Expired(connection) ? "recoveryRequired" : "pendingCreation"));
+            return Ok(new OnboardingStatus(RequiresRecovery(connection) ? "recoveryRequired" : "pendingCreation"));
         try
         {
             var account = await stripe.GetAccount(connection.AccountId, cancellationToken);
@@ -56,7 +56,11 @@ public sealed class StripeConnectController(TimeNestDbContext database, IStripeC
             .SingleOrDefaultAsync(x => x.BusinessId == business.Id, cancellationToken);
         if (connection is null)
         {
-            connection = new StripeConnection { BusinessId = business.Id, CreationStartedAt = clock.GetUtcNow() };
+            var email = await database.Users.Where(x => x.Id == business.OwnerId)
+                .Select(x => x.Email).SingleAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(email)) return Unavailable();
+            connection = new StripeConnection
+            { BusinessId = business.Id, CreationStartedAt = clock.GetUtcNow(), ContactEmail = email };
             database.StripeConnections.Add(connection);
             try { await database.SaveChangesAsync(cancellationToken); }
             catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
@@ -71,9 +75,9 @@ public sealed class StripeConnectController(TimeNestDbContext database, IStripeC
         {
             if (connection.AccountId is null)
             {
-                // Stripe may prune idempotency keys after 24h. Never blindly create again after that window.
-                if (Expired(connection)) return Conflict(new { code = "recoveryRequired" });
-                var accountId = await stripe.CreateAccount(business.Id, cancellationToken);
+                // Never replay an uncertain v1 attempt through v2 or exceed the v2 replay window.
+                if (RequiresRecovery(connection)) return Conflict(new { code = "recoveryRequired" });
+                var accountId = await stripe.CreateAccount(business.Id, connection.ContactEmail!, cancellationToken);
                 await database.StripeConnections.Where(x => x.BusinessId == business.Id && x.AccountId == null)
                     .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.AccountId, accountId), cancellationToken);
                 connection = await database.StripeConnections.AsNoTracking()
@@ -84,6 +88,8 @@ public sealed class StripeConnectController(TimeNestDbContext database, IStripeC
         catch (StripeConnectUnavailableException) { return Unavailable(); }
     }
 
-    private bool Expired(StripeConnection connection) => clock.GetUtcNow() - connection.CreationStartedAt >= TimeSpan.FromHours(23);
+    private bool RequiresRecovery(StripeConnection connection) =>
+        connection.CreationApiVersion != 2 || string.IsNullOrWhiteSpace(connection.ContactEmail) ||
+        clock.GetUtcNow() - connection.CreationStartedAt >= TimeSpan.FromDays(29);
     private ObjectResult Unavailable() => Problem(statusCode: 503, title: "Maksujen käyttöönotto ei ole nyt käytettävissä.");
 }

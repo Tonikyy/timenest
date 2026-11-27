@@ -23,12 +23,12 @@ public sealed class StripeStub : HttpMessageHandler
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
         var key = request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null;
         Requests.Enqueue((path, body, key));
-        if (path == "/v1/accounts" && request.Method == HttpMethod.Post)
+        if (path == "/v2/core/accounts" && request.Method == HttpMethod.Post)
         {
             var id = AccountsByKey.GetOrAdd(key!, _ => "acct_" + Guid.NewGuid().ToString("N"));
             Accounts.TryAdd(id, new ConnectedAccount(id, false, false, false, false));
-            if (FailAfterCreation) return Failure();
-            return Json(new { id, @object = "account" });
+            if (FailAfterCreation) throw new HttpRequestException("Simulated lost response after provider success.");
+            return Json(new { id, @object = "v2.core.account", livemode = false });
         }
         if (path.StartsWith("/v1/accounts/") && request.Method == HttpMethod.Get)
         {
