@@ -9,6 +9,8 @@ public sealed partial class StripeStub
     public ConcurrentDictionary<string, TestCheckout> CheckoutsByKey { get; } = new();
     public ConcurrentDictionary<string, TestCheckout> Checkouts { get; } = new();
     public bool LoseCheckoutResponse { get; set; }
+    public bool FailCheckoutExpiry { get; set; }
+    public bool PayDuringExpiry { get; set; }
     public bool FailCheckoutReads { get; set; }
 
     private HttpResponseMessage? Checkout(string path, HttpMethod method, string body, string? key)
@@ -27,6 +29,14 @@ public sealed partial class StripeStub
             });
             Checkouts[item.Id] = item;
             if (LoseCheckoutResponse) throw new HttpRequestException("Simulated lost checkout response.");
+            return Json(item.Payload());
+        }
+        if (path.StartsWith("/v1/checkout/sessions/") && path.EndsWith("/expire") && method == HttpMethod.Post)
+        {
+            var item = Checkouts[path.Split('/')[4]];
+            if (PayDuringExpiry) item.Pay();
+            if (FailCheckoutExpiry || item.Status != "open") return Failure();
+            item.Status = "expired";
             return Json(item.Payload());
         }
         if (path.StartsWith("/v1/checkout/sessions/") && method == HttpMethod.Get)

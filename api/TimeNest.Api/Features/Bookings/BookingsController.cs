@@ -11,17 +11,19 @@ namespace TimeNest.Api.Features.Bookings;
 public sealed record ReserveRequest(Guid VacancyId);
 public sealed record BookingView(Guid Id, string Title, string BusinessName, string Address, string City,
     DateTimeOffset StartsAt, int DurationMinutes, int PriceCents, int FeeCents, string Currency,
-    string Status, DateTimeOffset HoldExpiresAt, DateTimeOffset CheckoutStartBefore, DateTimeOffset? ConfirmedAt, bool RecoveryRequired)
+    string Status, DateTimeOffset HoldExpiresAt, DateTimeOffset CheckoutStartBefore, DateTimeOffset? ConfirmedAt, bool RecoveryRequired, string CancellationPolicy, bool CancellationRequested,
+    CancellationView? Cancellation = null, RefundView? Refund = null)
 {
     public static BookingView From(Booking b, bool recovery = false) => new(b.Id, b.Title, b.BusinessName, b.Address,
         b.City, b.StartsAt, b.DurationMinutes, b.PriceCents, b.FeeCents, b.Currency, b.Status.ToString(),
-        b.HoldExpiresAt, b.CreatedAt.AddMinutes(4), b.ConfirmedAt, recovery);
+        b.HoldExpiresAt, b.CreatedAt.AddMinutes(4), b.ConfirmedAt, recovery, b.CancellationPolicy.ToString(),
+        b.CheckoutCancellationRequestedAt is not null);
 }
 
 [ApiController, Authorize, Route("api/bookings")]
 [EnableRateLimiting("checkout")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class BookingsController(TimeNestDbContext database, CheckoutService checkout) : ControllerBase
+public sealed class BookingsController(TimeNestDbContext database, CheckoutService checkout, Cancellations cancellations, BookingViews views) : ControllerBase
 {
     private string CustomerId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
@@ -41,7 +43,7 @@ public sealed class BookingsController(TimeNestDbContext database, CheckoutServi
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Id)
             .Skip((page - 1) * 20).Take(20).ToListAsync(ct);
-        return Ok(new { items = rows.Select(x => BookingView.From(x)), total, page, pageSize = 20 });
+        return Ok(new { items = await views.Read(rows, ct), total, page, pageSize = 20 });
     }
 
     [HttpGet("{id:guid}")]
@@ -49,8 +51,7 @@ public sealed class BookingsController(TimeNestDbContext database, CheckoutServi
     {
         var booking = await Owned(id, ct);
         if (booking is null) return NotFound();
-        var recovery = await database.CheckoutPayments.AnyAsync(x => x.BookingId == id && x.Status == CheckoutStatus.RecoveryRequired, ct);
-        return Ok(BookingView.From(booking, recovery));
+        return Ok((await views.Read([booking], ct))[0]);
     }
 
     [HttpPost("{id:guid}/checkout")]
@@ -67,6 +68,26 @@ public sealed class BookingsController(TimeNestDbContext database, CheckoutServi
     {
         if (await Owned(id, ct) is null) return NotFound();
         try { await checkout.Reconcile(id, ct); return await Get(id, ct); }
+        catch (StripeConnectUnavailableException) { return Unavailable(); }
+    }
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            if (!await cancellations.Cancel(id, CustomerId, false, ct)) return NotFound();
+            return await Get(id, ct);
+        }
+        catch (BookingConflictException e) { return Conflict(new { code = e.Code }); }
+    }
+
+    [HttpPost("{id:guid}/abandon")]
+    public async Task<IActionResult> Abandon(Guid id, CancellationToken ct)
+    {
+        if (await Owned(id, ct) is null) return NotFound();
+        try { await checkout.Abandon(id, ct); return await Get(id, ct); }
+        catch (BookingConflictException e) { return Conflict(new { code = e.Code }); }
         catch (StripeConnectUnavailableException) { return Unavailable(); }
     }
 

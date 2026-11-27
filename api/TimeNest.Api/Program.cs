@@ -31,6 +31,8 @@ builder.Services.AddRateLimiter(options => options.AddPolicy("stripe-connect", c
         _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
         { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddScoped<Reservations>();
+builder.Services.AddScoped<Cancellations>();
+builder.Services.AddScoped<BookingViews>();
 builder.Services.AddScoped<CheckoutService>();
 builder.Services.AddScoped<IStripeCheckoutGateway, StripeCheckoutGateway>();
 if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<CheckoutReconciler>();

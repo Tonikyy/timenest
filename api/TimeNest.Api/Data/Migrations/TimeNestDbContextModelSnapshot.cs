@@ -240,6 +240,14 @@ namespace TimeNest.Api.Data.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("nvarchar(160)");
 
+                    b.Property<string>("CancellationPolicy")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset?>("CheckoutCancellationRequestedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -322,9 +330,33 @@ namespace TimeNest.Api.Data.Migrations
 
                     b.ToTable("Bookings", t =>
                         {
-                            t.HasCheckConstraint("CK_Bookings_Active", "([Status] IN ('Pending', 'Confirmed') AND [IsActive] = 1) OR ([Status] = 'Expired' AND [IsActive] = 0)");
+                            t.HasCheckConstraint("CK_Bookings_Active", "([Status] IN ('Pending', 'Confirmed') AND [IsActive] = 1) OR ([Status] IN ('Expired', 'Cancelled') AND [IsActive] = 0)");
 
                             t.HasCheckConstraint("CK_Bookings_PriceFee", "[PriceCents] >= 50 AND [FeeCents] >= 0 AND [FeeCents] < [PriceCents]");
+                        });
+                });
+
+            modelBuilder.Entity("TimeNest.Api.Features.Bookings.BookingCancellation", b =>
+                {
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("CancelledAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("RefundAmountCents")
+                        .HasColumnType("int");
+
+                    b.HasKey("BookingId");
+
+                    b.ToTable("BookingCancellations", t =>
+                        {
+                            t.HasCheckConstraint("CK_Cancellations_Refund", "[RefundAmountCents] >= 0");
                         });
                 });
 
@@ -417,6 +449,54 @@ namespace TimeNest.Api.Data.Migrations
                         .HasFilter("[SessionId] IS NOT NULL");
 
                     b.ToTable("CheckoutPayments");
+                });
+
+            modelBuilder.Entity("TimeNest.Api.Features.Payments.PaymentRefund", b =>
+                {
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AmountCents")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("AttemptedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTimeOffset?>("LastCheckedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PaymentIntentId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("StripeRefundId")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.HasKey("BookingId");
+
+                    b.HasIndex("StripeRefundId")
+                        .IsUnique()
+                        .HasFilter("[StripeRefundId] IS NOT NULL");
+
+                    b.ToTable("PaymentRefunds", t =>
+                        {
+                            t.HasCheckConstraint("CK_Refunds_Amount", "[AmountCents] > 0");
+                        });
                 });
 
             modelBuilder.Entity("TimeNest.Api.Features.Payments.StripeConnection", b =>
@@ -600,6 +680,15 @@ namespace TimeNest.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("TimeNest.Api.Features.Bookings.BookingCancellation", b =>
+                {
+                    b.HasOne("TimeNest.Api.Features.Bookings.Booking", null)
+                        .WithOne()
+                        .HasForeignKey("TimeNest.Api.Features.Bookings.BookingCancellation", "BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("TimeNest.Api.Features.Businesses.Business", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
@@ -613,6 +702,15 @@ namespace TimeNest.Api.Data.Migrations
                     b.HasOne("TimeNest.Api.Features.Bookings.Booking", null)
                         .WithOne()
                         .HasForeignKey("TimeNest.Api.Features.Payments.CheckoutPayment", "BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TimeNest.Api.Features.Payments.PaymentRefund", b =>
+                {
+                    b.HasOne("TimeNest.Api.Features.Bookings.BookingCancellation", null)
+                        .WithOne()
+                        .HasForeignKey("TimeNest.Api.Features.Payments.PaymentRefund", "BookingId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

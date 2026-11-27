@@ -10,6 +10,8 @@ namespace TimeNest.Api.Data;
 
 public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> options) : IdentityDbContext<IdentityUser>(options)
 {
+    public DbSet<BookingCancellation> BookingCancellations => Set<BookingCancellation>();
+    public DbSet<PaymentRefund> PaymentRefunds => Set<PaymentRefund>();
     public DbSet<CheckoutPayment> CheckoutPayments => Set<CheckoutPayment>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<StripeConnection> StripeConnections => Set<StripeConnection>();
@@ -20,6 +22,24 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<BookingCancellation>(entity =>
+        {
+            entity.HasKey(x => x.BookingId);
+            entity.Property(x => x.Actor).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne<Booking>().WithOne().HasForeignKey<BookingCancellation>(x => x.BookingId).OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable(t => t.HasCheckConstraint("CK_Cancellations_Refund", "[RefundAmountCents] >= 0"));
+        });
+        modelBuilder.Entity<PaymentRefund>(entity =>
+        {
+            entity.HasKey(x => x.BookingId);
+            entity.Property(x => x.PaymentIntentId).HasMaxLength(255);
+            entity.Property(x => x.StripeRefundId).HasMaxLength(255);
+            entity.Property(x => x.Currency).HasMaxLength(3);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            entity.HasIndex(x => x.StripeRefundId).IsUnique();
+            entity.HasOne<BookingCancellation>().WithOne().HasForeignKey<PaymentRefund>(x => x.BookingId).OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable(t => t.HasCheckConstraint("CK_Refunds_Amount", "[AmountCents] > 0"));
+        });
         modelBuilder.Entity<CheckoutPayment>(entity =>
         {
             entity.HasKey(x => x.BookingId);
@@ -34,6 +54,7 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
         modelBuilder.Entity<Booking>(entity =>
         {
             entity.Property(x => x.Version).IsRowVersion();
+            entity.Property(x => x.CancellationPolicy).HasConversion<string>().HasMaxLength(40);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             entity.Property(x => x.Title).HasMaxLength(160);
             entity.Property(x => x.BusinessName).HasMaxLength(160);
@@ -50,7 +71,7 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
             entity.ToTable(table =>
             {
                 table.HasCheckConstraint("CK_Bookings_PriceFee", "[PriceCents] >= 50 AND [FeeCents] >= 0 AND [FeeCents] < [PriceCents]");
-                table.HasCheckConstraint("CK_Bookings_Active", "([Status] IN ('Pending', 'Confirmed') AND [IsActive] = 1) OR ([Status] = 'Expired' AND [IsActive] = 0)");
+                table.HasCheckConstraint("CK_Bookings_Active", "([Status] IN ('Pending', 'Confirmed') AND [IsActive] = 1) OR ([Status] IN ('Expired', 'Cancelled') AND [IsActive] = 0)");
             });
         });
         modelBuilder.Entity<Business>(entity =>
