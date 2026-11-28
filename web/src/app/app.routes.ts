@@ -1,3 +1,4 @@
+import { NotificationsPage } from './features/notifications/notifications';
 import { BookingsPage } from './features/bookings/bookings';
 import { Routes } from '@angular/router';
 import { PaymentsPage } from './features/business/payments';
@@ -8,6 +9,7 @@ import { AccountPage } from './features/account/account';
 
 export const routes: Routes = [
   { path: '', component: Discovery },
+  { path: 'notifications', component: NotificationsPage },
   { path: 'bookings', component: BookingsPage },
   { path: 'bookings/:id', component: BookingsPage },
   { path: 'account', component: AccountPage, data: { mode: 'home' } },

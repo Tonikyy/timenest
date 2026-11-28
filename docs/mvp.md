@@ -44,7 +44,7 @@ These are demo policies, not finalized terms for a real-money pilot.
 1. **Runnable foundation:** Angular calls ASP.NET Core and SQL Server; migration, clearly marked demo openings, CI, original branding.
 2. **Business publishing:** accounts, business ownership/profile, publish/manage demo slots. Stripe sandbox onboarding is implemented separately; a real hosted round trip with fictional test data reached ready on 2026-11-27.
 3. **Discovery and paid booking:** Stripe sandbox onboarding, location/service/date search, reservation, Checkout, verified payment confirmation, double-booking protection.
-4. **Cancellation and recovery:** cancellation/refunds, abandoned-checkout cleanup, retry-safe webhook processing and customer/business booking views are implemented. Notification delivery and an operator recovery UI remain planned.
+4. **Cancellation and recovery:** cancellation/refunds, abandoned-checkout cleanup, retry-safe webhook processing and customer/business booking views are implemented. Booking, cancellation and refund notifications are implemented through a signed-in inbox and Development-only local mailbox. An operator recovery UI and real email delivery remain planned.
 5. **Azure demo:** Bicep, OIDC deployment, controlled migrations, monitoring, costs, end-to-end smoke tests.
 6. **Real pilot:** live onboarding, agreed commercial/cancellation policies, operational recovery and real email delivery.
 

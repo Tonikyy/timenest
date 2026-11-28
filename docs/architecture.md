@@ -8,7 +8,6 @@ api/TimeNest.Api/
   Data/              EF Core context, mappings, migrations
   Integrations/      Concrete external provider integrations when implemented
   BackgroundJobs/    Persistent payment/retry work when implemented
-  Notifications/     Delivery integration when implemented
 web/src/app/
   core/              Shared application services
   shared/            Reusable UI
@@ -28,4 +27,4 @@ Angular talks to relative /api URLs. A development proxy reaches the API locally
 
 SQL Server is the source of truth for bookings and financial state. Stripe is the payment processor. Webhook processing and reconciliation must tolerate retries, out-of-order events, restarts, and partial failure between SQL and Stripe.
 
-Demo data is an explicit opt-in development operation. Never seed automatically in production. Identity is implemented in the accounts slice. Sandbox Connect and customer Checkout are implemented. Signed Stripe webhooks and a periodic worker reconcile pending payments against the provider; customer/business cancellation and a separate durable refund worker are also implemented. Policy is snapshotted on each booking; cancellation, payment and refund records preserve distinct history. Azure deployment, notification delivery, operator tooling and live payments remain later milestones.
+Demo data is an explicit opt-in development operation. Never seed automatically in production. Identity is implemented in the accounts slice. Sandbox Connect and customer Checkout are implemented. Signed Stripe webhooks and a periodic worker reconcile pending payments against the provider; customer/business cancellation and a separate durable refund worker are also implemented. Policy is snapshotted on each booking; cancellation, payment and refund records preserve distinct history. Features/Notifications records immutable recipient messages in the same transaction as booking/refund changes. Its SQL rows serve both the owned inbox and a leased email outbox. A Development-only worker writes atomic local mailbox files with bounded retries; no broker or external provider is needed for this demo. Azure deployment, real email delivery, operator tooling and live payments remain later milestones.

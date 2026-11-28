@@ -1,0 +1,87 @@
+<main class="workspace narrow">
+  <a routerLink="/" aria-label="TimeNest - etusivu"
+    ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
+  /></a>
+  <nav class="workspace-nav" aria-label="Ilmoitusten valikko">
+    <a routerLink="/">Löydä aika</a><a routerLink="/bookings">Omat varaukset</a>
+    <a routerLink="/business/bookings">Asiakasvaraukset</a><a routerLink="/account">Oma tili</a>
+  </nav>
+  <h1>Ilmoitukset</h1>
+  <p>Varausten, peruutusten ja maksun palautusten viestit yhdessä paikassa.</p>
+  <p class="form-success">Esittelytila – vain kuvitteellisia palveluja ja testimaksuja.</p>
+  <button
+    class="secondary-button"
+    type="button"
+    (click)="load()"
+    [disabled]="busy() || !!reading()"
+  >
+    Päivitä ilmoitukset
+  </button>
+  @if (busy()) {
+    <p role="status">Ladataan ilmoituksia…</p>
+  }
+  @if (error()) {
+    <p class="form-error" role="alert">{{ error() }}</p>
+  }
+  @if (signedOut()) {
+    <a routerLink="/account/login">Kirjaudu sisään</a>
+  }
+  @if (result(); as inbox) {
+    <p aria-live="polite">{{ inbox.unread }} lukematonta ilmoitusta</p>
+    @if (inbox.items.length === 0) {
+      <p>Ei ilmoituksia tällä sivulla. Uudet varausviestit näkyvät täällä.</p>
+    }
+    @for (item of inbox.items; track item.id) {
+      <article
+        class="managed-slot"
+        [class.unread]="!item.readAt"
+        [attr.aria-labelledby]="'notice-' + item.id"
+      >
+        <div class="notice-heading">
+          <h2 [id]="'notice-' + item.id">{{ item.subject }}</h2>
+          @if (!item.readAt) {
+            <strong class="eyebrow">Lukematon</strong>
+          }
+        </div>
+        <p>
+          <time [attr.datetime]="item.createdAt">{{ date(item.createdAt) }}</time> · Suomen aikaa
+        </p>
+        <p class="notice-body">{{ item.body }}</p>
+        <div class="workspace-nav">
+          <a [routerLink]="item.link">Katso varauksen ajantasainen tila</a>
+          @if (!item.readAt) {
+            <button
+              class="secondary-button"
+              type="button"
+              (click)="markRead(item)"
+              [disabled]="!!reading()"
+            >
+              {{ reading() === item.id ? 'Tallennetaan…' : 'Merkitse luetuksi' }}
+            </button>
+          } @else {
+            <span>Luettu</span>
+          }
+        </div>
+      </article>
+    }
+    <nav class="workspace-nav" aria-label="Ilmoitusten sivut">
+      <button
+        class="secondary-button"
+        type="button"
+        (click)="load(inbox.page - 1)"
+        [disabled]="inbox.page <= 1 || !!reading()"
+      >
+        Edellinen
+      </button>
+      <span>Sivu {{ inbox.page }}</span>
+      <button
+        class="secondary-button"
+        type="button"
+        (click)="load(inbox.page + 1)"
+        [disabled]="inbox.page * inbox.pageSize >= inbox.total || !!reading()"
+      >
+        Seuraava
+      </button>
+    </nav>
+  }
+</main>
