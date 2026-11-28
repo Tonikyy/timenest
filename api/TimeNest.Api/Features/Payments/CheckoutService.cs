@@ -23,6 +23,21 @@ public sealed class CheckoutService(TimeNestDbContext database, Reservations res
         return (await reservations.Reserve(vacancyId, customerId, options.Value.ApplicationFeeCents, ct)).Id;
     }
 
+    public async Task Abandon(Guid bookingId, CancellationToken ct)
+    {
+        database.ChangeTracker.Clear();
+        await using (var tx = await database.Database.BeginTransactionAsync(ct))
+        {
+            var booking = await Locked(bookingId, ct);
+            if (booking.Status is BookingStatus.Expired or BookingStatus.Cancelled) return;
+            if (booking.Status != BookingStatus.Pending) throw new BookingConflictException("paymentCompleted");
+            booking.CheckoutCancellationRequestedAt ??= clock.GetUtcNow();
+            await database.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
+        await Reconcile(bookingId, ct);
+    }
+
     public async Task<string?> Continue(Guid bookingId, CancellationToken ct)
     {
         var snapshot = await database.Bookings.AsNoTracking().SingleAsync(x => x.Id == bookingId, ct);
@@ -34,7 +49,7 @@ public sealed class CheckoutService(TimeNestDbContext database, Reservations res
         await using (var transaction = await database.Database.BeginTransactionAsync(ct))
         {
             var booking = await Locked(bookingId, ct);
-            if (booking.Status != BookingStatus.Pending) return null;
+            if (booking.Status != BookingStatus.Pending || booking.CheckoutCancellationRequestedAt is not null) return null;
             var payment = await database.CheckoutPayments.SingleOrDefaultAsync(x => x.BookingId == bookingId, ct);
             if (payment is null)
             {
@@ -62,7 +77,7 @@ public sealed class CheckoutService(TimeNestDbContext database, Reservations res
         var payment = await database.CheckoutPayments.AsNoTracking().SingleOrDefaultAsync(x => x.BookingId == bookingId, ct);
         if (payment is null)
         {
-            if (clock.GetUtcNow() < booking.HoldExpiresAt) return null;
+            if (booking.CheckoutCancellationRequestedAt is null && clock.GetUtcNow() < booking.HoldExpiresAt) return null;
             database.ChangeTracker.Clear();
             await using var tx = await database.Database.BeginTransactionAsync(ct);
             booking = await Locked(bookingId, ct);
@@ -89,8 +104,14 @@ public sealed class CheckoutService(TimeNestDbContext database, Reservations res
         var session = payment.SessionId is null
             ? await stripe.Create(booking, payment, ct)
             : await stripe.Get(payment.SessionId, ct);
+        if (booking.CheckoutCancellationRequestedAt is not null && session.Status == "open")
+        {
+            try { await stripe.Expire(session.Id, ct); }
+            catch (StripeConnectUnavailableException) { /* Read back: expiry may have succeeded or payment may have won. */ }
+            session = await stripe.Get(session.Id, ct);
+        }
         await Apply(bookingId, session, ct);
-        if (session.Status != "open") return null;
+        if (session.Status != "open" || booking.CheckoutCancellationRequestedAt is not null) return null;
         if (!Uri.TryCreate(session.Url, UriKind.Absolute, out var url) || url.Scheme != "https" ||
             url.Host != "checkout.stripe.com" || !url.IsDefaultPort || url.UserInfo.Length != 0)
             throw new StripeConnectUnavailableException();
@@ -153,6 +174,15 @@ public sealed class CheckoutService(TimeNestDbContext database, Reservations res
         var changed = await database.Vacancies.Where(x => x.Id == booking.VacancyId && x.Status == VacancyStatus.Held)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, VacancyStatus.Available), ct);
         if (changed != 1) throw new StripeConnectUnavailableException();
-        booking.Status = BookingStatus.Expired; booking.IsActive = false; booking.ExpiredAt = clock.GetUtcNow();
+        booking.IsActive = false;
+        if (booking.CheckoutCancellationRequestedAt is not null)
+        {
+            booking.Status = BookingStatus.Cancelled;
+            database.BookingCancellations.Add(new BookingCancellation
+            {
+                BookingId = booking.Id, Actor = CancellationActor.Customer, CancelledAt = clock.GetUtcNow()
+            });
+        }
+        else { booking.Status = BookingStatus.Expired; booking.ExpiredAt = clock.GetUtcNow(); }
     }
 }

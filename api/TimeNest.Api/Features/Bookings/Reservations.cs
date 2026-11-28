@@ -43,6 +43,7 @@ public sealed class Reservations(TimeNestDbContext database, TimeProvider clock)
 
         var booking = new Booking
         {
+            CancellationPolicy = CancellationPolicy.LastMinuteNoRefund,
             Id = Guid.NewGuid(), VacancyId = slot.Id, BusinessId = slot.BusinessId, CustomerId = customerId,
             Title = slot.Title, BusinessName = slot.Business.Name, Address = slot.Business.Address, City = slot.Business.City,
             ServiceTypeId = slot.ServiceTypeId, StartsAt = slot.StartsAt, DurationMinutes = slot.DurationMinutes,

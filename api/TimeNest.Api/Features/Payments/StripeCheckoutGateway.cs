@@ -8,6 +8,7 @@ namespace TimeNest.Api.Features.Payments;
 public interface IStripeCheckoutGateway
 {
     Task<Session> Create(Booking booking, CheckoutPayment payment, CancellationToken ct);
+    Task<Session> Expire(string sessionId, CancellationToken ct);
     Task<Session> Get(string sessionId, CancellationToken ct);
 }
 
@@ -45,6 +46,9 @@ public sealed class StripeCheckoutGateway(IOptions<StripeConnectOptions> options
 
     public Task<Session> Get(string sessionId, CancellationToken ct) => Call(() =>
         Client().V1.Checkout.Sessions.GetAsync(sessionId, new SessionGetOptions { Expand = ["payment_intent"] }, cancellationToken: ct));
+
+    public Task<Session> Expire(string sessionId, CancellationToken ct) => Call(() =>
+        Client().V1.Checkout.Sessions.ExpireAsync(sessionId, cancellationToken: ct));
 
     private static async Task<Session> Call(Func<Task<Session>> action)
     {

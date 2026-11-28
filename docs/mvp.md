@@ -22,9 +22,9 @@ Include account registration, verification, recovery, nearby search, service/dat
 - Stripe Connect sandbox Express onboarding and hosted card Checkout are implemented. A real sandbox customer payment reached a server-verified confirmed booking on 2026-11-27.
 - Fixed EUR 5 application fee deducted from the advertised price; make the fee configurable and snapshot it on each booking.
 - With destination charges, payment-provider costs come out of the platform's proceeds.
-- Full refund, including the platform fee, for customer cancellation before the start; full refund for business cancellation.
+- New bookings: customer cancellation before the start releases the slot without an automatic refund after payment. Business cancellation creates a full refund including the platform fee. Existing bookings retain their original full-refund-before-start policy; see decisions/005-cancellations-and-refunds.md.
 - Reservations last 35 minutes; start Checkout within four minutes, for appointments more than 40 minutes away. Never release a hold based solely on a local timer while payment remains possible.
-- Only card payments are enabled. Confirmed-booking cancellation and refunds remain planned.
+- Only card payments are enabled. Cancellation lifecycle and durable refund obligations are implemented; the dependent provider and UI slices add processing and screens.
 
 These are demo policies, not finalized terms for a real-money pilot.
 
