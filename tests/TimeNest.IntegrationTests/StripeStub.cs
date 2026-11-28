@@ -23,6 +23,7 @@ public sealed partial class StripeStub : HttpMessageHandler
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
         var key = request.Headers.TryGetValues("Idempotency-Key", out var keys) ? keys.Single() : null;
         Requests.Enqueue((path, body, key));
+        if (Refund(path, request.Method, body, key) is { } refund) return refund;
         if (Checkout(path, request.Method, body, key) is { } checkout) return checkout;
         if (path == "/v2/core/accounts" && request.Method == HttpMethod.Post)
         {

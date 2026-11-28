@@ -7,7 +7,7 @@ namespace TimeNest.Api.Features.Payments;
 
 [ApiController, AllowAnonymous, Route("api/payments/stripe/webhook")]
 [IgnoreAntiforgeryToken, RequestSizeLimit(131072)]
-public sealed class StripeWebhookController(CheckoutService checkout, IOptions<StripeConnectOptions> options) : ControllerBase
+public sealed class StripeWebhookController(CheckoutService checkout, RefundService refunds, IOptions<StripeConnectOptions> options) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Receive(CancellationToken ct)
@@ -23,6 +23,12 @@ public sealed class StripeWebhookController(CheckoutService checkout, IOptions<S
 
         // Destination-charge sessions belong to the platform, not connected-account event streams.
         if (stripeEvent.Livemode || stripeEvent.Account is not null) return BadRequest();
+        if (stripeEvent.Type is "refund.created" or "refund.updated" or "refund.failed")
+        {
+            if (stripeEvent.Data.Object is not Refund refund) return BadRequest();
+            try { await refunds.Receive(refund.Id, ct); return Ok(); }
+            catch (StripeConnectUnavailableException) { return StatusCode(503); }
+        }
         if (stripeEvent.Type is not ("checkout.session.completed" or "checkout.session.expired" or
             "checkout.session.async_payment_succeeded" or "checkout.session.async_payment_failed")) return Ok();
         if (stripeEvent.Data.Object is not Stripe.Checkout.Session session) return BadRequest();
