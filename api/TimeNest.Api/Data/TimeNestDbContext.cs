@@ -1,3 +1,4 @@
+using TimeNest.Api.Features.Notifications;
 using TimeNest.Api.Features.Bookings;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -10,6 +11,7 @@ namespace TimeNest.Api.Data;
 
 public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> options) : IdentityDbContext<IdentityUser>(options)
 {
+    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BookingCancellation> BookingCancellations => Set<BookingCancellation>();
     public DbSet<PaymentRefund> PaymentRefunds => Set<PaymentRefund>();
     public DbSet<CheckoutPayment> CheckoutPayments => Set<CheckoutPayment>();
@@ -22,6 +24,23 @@ public sealed class TimeNestDbContext(DbContextOptions<TimeNestDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(x => x.Sequence).UseIdentityColumn();
+            entity.HasIndex(x => x.Sequence).IsUnique();
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.Audience).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.EmailStatus).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.RecipientEmail).HasMaxLength(254);
+            entity.Property(x => x.Subject).HasMaxLength(160);
+            entity.Property(x => x.Body).HasMaxLength(4000);
+            entity.Property(x => x.Link).HasMaxLength(100);
+            entity.HasIndex(x => new { x.BookingId, x.Kind, x.RecipientId }).IsUnique();
+            entity.HasIndex(x => new { x.RecipientId, x.Sequence });
+            entity.HasIndex(x => new { x.EmailStatus, x.NextAttemptAt });
+            entity.HasOne<Booking>().WithMany().HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<IdentityUser>().WithMany().HasForeignKey(x => x.RecipientId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<BookingCancellation>(entity =>
         {
             entity.HasKey(x => x.BookingId);

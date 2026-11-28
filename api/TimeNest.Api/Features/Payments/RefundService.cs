@@ -1,3 +1,4 @@
+using TimeNest.Api.Features.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
 using TimeNest.Api.Data;
@@ -20,6 +21,8 @@ public sealed class RefundService(TimeNestDbContext database, IStripeRefundGatew
                 now - payment.AttemptedAt >= TimeSpan.FromHours(23))
             {
                 payment.Status = RefundStatus.RecoveryRequired;
+                var booking = await database.Bookings.AsNoTracking().SingleAsync(x => x.Id == id, ct);
+                await BookingNotifications.Record(database, booking, NotificationKind.RefundNeedsAttention, now, ct, payment.AmountCents);
                 await database.SaveChangesAsync(ct); await tx.CommitAsync(ct); return;
             }
             // Persist before network I/O: an exception does not establish that no refund exists.
@@ -62,6 +65,13 @@ public sealed class RefundService(TimeNestDbContext database, IStripeRefundGatew
         // A delayed pending response cannot undo success. Banks can report a later failure.
         if (payment.Status == RefundStatus.Failed ||
             (payment.Status == RefundStatus.Succeeded && status != RefundStatus.Failed)) return;
+        if (status is RefundStatus.Succeeded or RefundStatus.Failed or RefundStatus.RecoveryRequired)
+        {
+            var booking = await database.Bookings.AsNoTracking().SingleAsync(x => x.Id == id, ct);
+            var kind = status == RefundStatus.Succeeded ? NotificationKind.RefundSucceeded :
+                status == RefundStatus.Failed ? NotificationKind.RefundFailed : NotificationKind.RefundNeedsAttention;
+            await BookingNotifications.Record(database, booking, kind, clock.GetUtcNow(), ct, payment.AmountCents);
+        }
         payment.StripeRefundId = refund.Id;
         payment.Status = status;
         if (status == RefundStatus.Succeeded) payment.SucceededAt ??= clock.GetUtcNow();
