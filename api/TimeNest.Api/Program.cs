@@ -1,3 +1,4 @@
+using TimeNest.Api.Features.Notifications;
 using TimeNest.Api.Features.Bookings;
 using TimeNest.Api.Features.Accounts;
 using TimeNest.Api.Features.Payments;
@@ -30,6 +31,9 @@ builder.Services.AddRateLimiter(options => options.AddPolicy("stripe-connect", c
         context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
         _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
         { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+builder.Services.AddScoped<INotificationEmail, DevelopmentNotificationEmail>();
+builder.Services.AddScoped<NotificationDelivery>();
+if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<NotificationWorker>();
 builder.Services.AddScoped<Reservations>();
 builder.Services.AddScoped<Cancellations>();
 builder.Services.AddScoped<BookingViews>();
