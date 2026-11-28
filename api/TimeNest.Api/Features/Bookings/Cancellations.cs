@@ -1,3 +1,4 @@
+using TimeNest.Api.Features.Notifications;
 using Microsoft.EntityFrameworkCore;
 using TimeNest.Api.Data;
 using TimeNest.Api.Features.Payments;
@@ -44,6 +45,8 @@ public sealed class Cancellations(TimeNestDbContext database, TimeProvider clock
                 .SetProperty(x => x.CancelledAt, business ? now : (DateTimeOffset?)null), ct);
         if (changed != 1) throw new BookingConflictException("slotChanged");
         booking.Status = BookingStatus.Cancelled; booking.IsActive = false;
+        await BookingNotifications.Record(database, booking, NotificationKind.BookingCancelled, now, ct,
+            amount, business ? CancellationActor.Business : CancellationActor.Customer);
         await database.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return true;

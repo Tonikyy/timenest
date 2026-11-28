@@ -1,3 +1,4 @@
+using TimeNest.Api.Features.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Stripe.Checkout;
@@ -154,6 +155,7 @@ public sealed class CheckoutService(TimeNestDbContext database, Reservations res
             if (changed != 1) throw new StripeConnectUnavailableException();
             booking.Status = BookingStatus.Confirmed; booking.ConfirmedAt = clock.GetUtcNow();
             payment.Status = CheckoutStatus.Paid; payment.PaidAt = clock.GetUtcNow(); payment.PaymentIntentId = intent.Id;
+            await BookingNotifications.Record(database, booking, NotificationKind.BookingConfirmed, clock.GetUtcNow(), ct);
         }
         else if (session.Status == "expired" && session.PaymentStatus == "unpaid" &&
             (intent is null || intent.Status is "canceled" or "requires_payment_method"))
