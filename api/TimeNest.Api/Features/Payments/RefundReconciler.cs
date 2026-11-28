@@ -20,7 +20,7 @@ public sealed class RefundReconciler(IServiceScopeFactory scopes, IOptions<Strip
                 var recent = clock.GetUtcNow().AddDays(-35);
                 // Also check recent successes: card refunds can fail later at the receiving bank.
                 var ids = await db.PaymentRefunds.Where(x => x.Status == RefundStatus.Queued ||
-                    x.Status == RefundStatus.Pending || (x.Status == RefundStatus.Succeeded && x.CreatedAt > recent))
+                    x.Status == RefundStatus.Pending || (x.Status == RefundStatus.Succeeded && x.SucceededAt > recent))
                     .OrderBy(x => x.LastCheckedAt).ThenBy(x => x.BookingId)
                     .Select(x => x.BookingId).Take(50).ToListAsync(stoppingToken);
                 foreach (var id in ids)

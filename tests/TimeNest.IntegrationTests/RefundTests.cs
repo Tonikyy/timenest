@@ -4,7 +4,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using TimeNest.Api.Data;
 using TimeNest.Api.Features.Bookings;
 using TimeNest.Api.Features.Payments;
@@ -168,5 +172,63 @@ public sealed class RefundTests(ApiFixture fixture)
         Assert.Equal(RefundStatus.RecoveryRequired, (await Read(id)).Status);
         (await Webhook(fixture.Stripe.RefundsByKey[$"timenest-refund-v1-{id:N}"], "refund.created")).EnsureSuccessStatusCode();
         Assert.Equal(RefundStatus.Succeeded, (await Read(id)).Status);
+    }
+
+    [Fact]
+    public async Task Worker_rechecks_new_success_after_long_pending_period_without_webhook()
+    {
+        var id = await Cancel();
+        fixture.Stripe.NewRefundStatus = "pending";
+        try { await Reconcile(id); }
+        finally { fixture.Stripe.NewRefundStatus = "succeeded"; }
+        var remote = fixture.Stripe.RefundsByKey[$"timenest-refund-v1-{id:N}"];
+        remote.Status = "succeeded";
+        await Reconcile(id, 40 * 24);
+        var succeeded = await Read(id);
+        Assert.Equal(RefundStatus.Succeeded, succeeded.Status);
+        Assert.Equal(ApiFixture.Now.AddDays(40), succeeded.SucceededAt);
+        await Reconcile(id, 41 * 24);
+        (await Webhook(remote)).EnsureSuccessStatusCode();
+        Assert.Equal(succeeded.SucceededAt, (await Read(id)).SucceededAt);
+        remote.Status = "failed";
+
+        using var worker = new RefundReconciler(fixture.Factory.Services.GetRequiredService<IServiceScopeFactory>(),
+            Options.Create(new StripeConnectOptions { SecretKey = "sk_test_local_stub_only" }),
+            new LaterClock(41 * 24), NullLogger<RefundReconciler>.Instance);
+        await worker.StartAsync(default);
+        try
+        {
+            var timeout = System.Diagnostics.Stopwatch.StartNew();
+            while ((await Read(id)).Status != RefundStatus.Failed && timeout.Elapsed < TimeSpan.FromSeconds(60))
+                await Task.Delay(500);
+            Assert.Equal(RefundStatus.Failed, (await Read(id)).Status);
+        }
+        finally { await worker.StopAsync(default); }
+    }
+
+    [Fact]
+    public async Task Monitoring_migration_gives_existing_successes_a_full_window()
+    {
+        var succeededId = await Cancel();
+        await Reconcile(succeededId);
+        var queuedId = await Cancel();
+        await using var scope = fixture.Factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TimeNestDbContext>();
+        var migrator = db.Database.GetService<IMigrator>();
+        var before = await db.Database.SqlQueryRaw<DateTimeOffset>(
+            "SELECT TODATETIMEOFFSET(SYSUTCDATETIME(), '+00:00') AS [Value]").SingleAsync();
+        try
+        {
+            // Simulate the existing schema/data rather than merely inspecting generated SQL.
+            await migrator.MigrateAsync("20261127221450_BookingCancellations");
+            await migrator.MigrateAsync();
+            var succeeded = await Read(succeededId);
+            Assert.NotNull(succeeded.SucceededAt);
+            var after = await db.Database.SqlQueryRaw<DateTimeOffset>(
+                "SELECT TODATETIMEOFFSET(SYSUTCDATETIME(), '+00:00') AS [Value]").SingleAsync();
+            Assert.InRange(succeeded.SucceededAt.Value, before, after);
+            Assert.Null((await Read(queuedId)).SucceededAt);
+        }
+        finally { await migrator.MigrateAsync(); }
     }
 }

@@ -487,6 +487,9 @@ namespace TimeNest.Api.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<DateTimeOffset?>("SucceededAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.HasKey("BookingId");
 
                     b.HasIndex("StripeRefundId")
