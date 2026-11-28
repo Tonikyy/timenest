@@ -18,6 +18,8 @@ export const routes: Routes = [
   { path: 'account/confirm', component: AccountPage, data: { mode: 'confirm-email' } },
   { path: 'account/resend', component: AccountPage, data: { mode: 'resend-confirmation' } },
   { path: 'business', component: BusinessPage },
+  { path: 'business/bookings', component: BookingsPage, data: { business: true } },
+  { path: 'business/bookings/:id', component: BookingsPage, data: { business: true } },
   { path: 'business/payments', component: PaymentsPage },
   { path: 'business/vacancies', component: PublishingPage },
   { path: '**', redirectTo: '' },

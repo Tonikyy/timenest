@@ -15,6 +15,9 @@ export class BookingsPage {
   private readonly api = inject(BookingsApi);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
+  readonly business = this.route.snapshot.data?.['business'] === true;
+  readonly bookingPath = this.business ? '/business/bookings' : '/bookings';
+  readonly confirming = signal(false);
   readonly id = this.route.snapshot.paramMap.get('id');
   readonly arrival = this.route.snapshot.queryParamMap.get('checkout');
   readonly booking = signal<Booking | null>(null);
@@ -27,7 +30,12 @@ export class BookingsPage {
   readonly price = (cents: number) =>
     new Intl.NumberFormat('fi-FI', { style: 'currency', currency: 'EUR' }).format(cents / 100);
   readonly label = (status: Booking['status']) =>
-    ({ Pending: 'Odottaa maksua', Confirmed: 'Vahvistettu', Expired: 'Vanhentunut' })[status];
+    ({
+      Pending: 'Odottaa maksua',
+      Confirmed: 'Vahvistettu',
+      Expired: 'Vanhentunut',
+      Cancelled: 'Peruttu',
+    })[status];
 
   constructor() {
     this.load(this.arrival === 'return' || this.arrival === 'cancel');
@@ -38,8 +46,9 @@ export class BookingsPage {
     this.busy.set(true);
     this.error.set('');
     this.signedOut.set(false);
+    this.confirming.set(false);
     if (this.id) {
-      (refresh ? this.api.refresh(this.id) : this.api.get(this.id))
+      (refresh && !this.business ? this.api.refresh(this.id) : this.api.get(this.id, this.business))
         .pipe(
           takeUntilDestroyed(this.destroyRef),
           finalize(() => this.busy.set(false)),
@@ -51,7 +60,7 @@ export class BookingsPage {
     } else {
       this.result.set(null);
       this.api
-        .list(page)
+        .list(page, this.business)
         .pipe(
           takeUntilDestroyed(this.destroyRef),
           finalize(() => this.busy.set(false)),
@@ -65,10 +74,12 @@ export class BookingsPage {
 
   pay() {
     if (
+      this.business ||
       !this.id ||
       this.busy() ||
       this.booking()?.status !== 'Pending' ||
-      this.booking()?.recoveryRequired
+      this.booking()?.recoveryRequired ||
+      this.booking()?.cancellationRequested
     )
       return;
     this.busy.set(true);
@@ -91,11 +102,48 @@ export class BookingsPage {
         error: (error: HttpErrorResponse) => this.failed(error),
       });
   }
+  askCancel() {
+    const item = this.booking();
+    if (
+      !this.busy() &&
+      item &&
+      (item.canCancel ||
+        (!this.business && item.status === 'Pending' && !item.cancellationRequested))
+    )
+      this.confirming.set(true);
+  }
+
+  cancel() {
+    const item = this.booking();
+    if (!this.id || !item || !this.confirming() || this.busy()) return;
+    this.busy.set(true);
+    this.error.set('');
+    (item.status === 'Pending' && !this.business
+      ? this.api.abandon(this.id)
+      : this.api.cancel(this.id, this.business)
+    )
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.busy.set(false)),
+      )
+      .subscribe({
+        next: (booking) => {
+          this.booking.set(booking);
+          this.confirming.set(false);
+        },
+        error: (error: HttpErrorResponse) => this.failed(error),
+      });
+  }
+
   private failed(error: HttpErrorResponse) {
     this.signedOut.set(error.status === 401);
     if (error.status === 401)
       this.error.set('Kirjaudu sisään ja avaa sen jälkeen Omat varaukset. Aiempi varaus säilyy.');
     else if (error.status === 404) this.error.set('Varausta ei löytynyt tälle tilille.');
+    else if (error.error?.code === 'alreadyStarted')
+      this.error.set('Aika on jo alkanut. Varausta ei voi enää perua tässä näkymässä.');
+    else if (error.error?.code === 'paymentCompleted' || error.error?.code === 'notConfirmed')
+      this.error.set('Varauksen tila muuttui. Tarkista tila ennen peruutusta.');
     else if (error.error?.code === 'paymentsUnavailable')
       this.error.set('Yritys ei voi ottaa maksuja vastaan juuri nyt. Yritä myöhemmin uudelleen.');
     else if (error.status === 429)

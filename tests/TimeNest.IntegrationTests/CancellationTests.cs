@@ -88,7 +88,10 @@ public sealed class CancellationTests(ApiFixture fixture)
             Assert.Equal(HttpStatusCode.Unauthorized, (await fixture.Client.PostAsJsonAsync($"/api/bookings/{id}/cancel", new { })).StatusCode);
             await using var scope = fixture.Factory.Services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<TimeNestDbContext>();
+            Assert.True((await customer.Http.GetFromJsonAsync<BookingView>($"/api/bookings/{id}"))!.CanCancel);
             await db.Bookings.Where(x => x.Id == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.StartsAt, ApiFixture.Now));
+            Assert.False((await customer.Http.GetFromJsonAsync<BookingView>($"/api/bookings/{id}"))!.CanCancel);
+            Assert.True((await owner.Http.GetFromJsonAsync<BookingView>($"/api/business/bookings/{id}"))!.CanCancel);
             Assert.Equal(HttpStatusCode.Conflict, (await customer.Post($"/api/bookings/{id}/cancel", new { })).StatusCode);
             (await owner.Post($"/api/business/bookings/{id}/cancel", new { })).EnsureSuccessStatusCode();
         }

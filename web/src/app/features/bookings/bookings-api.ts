@@ -14,11 +14,23 @@ export interface Booking {
   priceCents: number;
   feeCents: number;
   currency: string;
-  status: 'Pending' | 'Confirmed' | 'Expired';
+  status: 'Pending' | 'Confirmed' | 'Expired' | 'Cancelled';
   holdExpiresAt: string;
   checkoutStartBefore: string;
   confirmedAt: string | null;
   recoveryRequired: boolean;
+  cancellationPolicy: 'LegacyFullRefundBeforeStart' | 'LastMinuteNoRefund';
+  cancellationRequested: boolean;
+  canCancel: boolean;
+  cancellation: {
+    actor: 'Customer' | 'Business';
+    cancelledAt: string;
+    refundAmountCents: number;
+  } | null;
+  refund: {
+    status: 'Queued' | 'Pending' | 'Succeeded' | 'Failed' | 'RecoveryRequired';
+    amountCents: number;
+  } | null;
 }
 export interface BookingPage {
   items: Booking[];
@@ -33,12 +45,14 @@ const bookingIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 export class BookingsApi {
   private readonly http = inject(HttpClient);
   private readonly session = inject(Session);
-  list(page: number) {
-    return this.http.get<BookingPage>('/api/bookings', { params: { page } });
+  list(page: number, business = false) {
+    return this.http.get<BookingPage>(business ? '/api/business/bookings' : '/api/bookings', {
+      params: { page },
+    });
   }
-  get(id: string) {
+  get(id: string, business = false) {
     if (!bookingIdPattern.test(id)) return throwError(() => new HttpErrorResponse({ status: 404 }));
-    return this.http.get<Booking>('/api/bookings/' + id);
+    return this.http.get<Booking>((business ? '/api/business/bookings/' : '/api/bookings/') + id);
   }
   reserve(vacancyId: string) {
     return this.session
@@ -54,6 +68,25 @@ export class BookingsApi {
           this.http.post<{ url: string | null }>('/api/bookings/' + id + '/checkout', {}),
         ),
       );
+  }
+  cancel(id: string, business = false) {
+    if (!bookingIdPattern.test(id)) return throwError(() => new HttpErrorResponse({ status: 404 }));
+    return this.session
+      .csrf()
+      .pipe(
+        switchMap(() =>
+          this.http.post<Booking>(
+            (business ? '/api/business/bookings/' : '/api/bookings/') + id + '/cancel',
+            {},
+          ),
+        ),
+      );
+  }
+  abandon(id: string) {
+    if (!bookingIdPattern.test(id)) return throwError(() => new HttpErrorResponse({ status: 404 }));
+    return this.session
+      .csrf()
+      .pipe(switchMap(() => this.http.post<Booking>('/api/bookings/' + id + '/abandon', {})));
   }
   refresh(id: string) {
     if (!bookingIdPattern.test(id)) return throwError(() => new HttpErrorResponse({ status: 404 }));

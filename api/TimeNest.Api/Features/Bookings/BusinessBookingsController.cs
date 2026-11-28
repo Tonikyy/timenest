@@ -24,14 +24,14 @@ public sealed class BusinessBookingsController(TimeNestDbContext database, Cance
         var total = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.StartsAt).ThenBy(x => x.Id)
             .Skip((page - 1) * 20).Take(20).ToListAsync(ct);
-        return Ok(new { items = await views.Read(rows, ct), total, page, pageSize = 20 });
+        return Ok(new { items = await views.Read(rows, ct, true), total, page, pageSize = 20 });
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
         var booking = await Owned().SingleOrDefaultAsync(x => x.Id == id, ct);
-        return booking is null ? NotFound() : Ok((await views.Read([booking], ct))[0]);
+        return booking is null ? NotFound() : Ok((await views.Read([booking], ct, true))[0]);
     }
 
     [HttpPost("{id:guid}/cancel")]

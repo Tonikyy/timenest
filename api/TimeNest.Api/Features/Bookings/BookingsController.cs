@@ -12,7 +12,7 @@ public sealed record ReserveRequest(Guid VacancyId);
 public sealed record BookingView(Guid Id, string Title, string BusinessName, string Address, string City,
     DateTimeOffset StartsAt, int DurationMinutes, int PriceCents, int FeeCents, string Currency,
     string Status, DateTimeOffset HoldExpiresAt, DateTimeOffset CheckoutStartBefore, DateTimeOffset? ConfirmedAt, bool RecoveryRequired, string CancellationPolicy, bool CancellationRequested,
-    CancellationView? Cancellation = null, RefundView? Refund = null)
+    CancellationView? Cancellation = null, RefundView? Refund = null, bool CanCancel = false)
 {
     public static BookingView From(Booking b, bool recovery = false) => new(b.Id, b.Title, b.BusinessName, b.Address,
         b.City, b.StartsAt, b.DurationMinutes, b.PriceCents, b.FeeCents, b.Currency, b.Status.ToString(),

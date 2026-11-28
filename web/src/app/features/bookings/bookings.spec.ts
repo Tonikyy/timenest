@@ -32,8 +32,13 @@ describe('Customer payments', () => {
     checkoutStartBefore: '2027-01-18T09:04:00Z',
     confirmedAt: null,
     recoveryRequired: false,
+    cancellationPolicy: 'LastMinuteNoRefund',
+    cancellationRequested: false,
+    canCancel: false,
+    cancellation: null,
+    refund: null,
   };
-  const setup = (id: string | null = pending.id, arrival = '') => {
+  const setup = (id: string | null = pending.id, arrival = '', business = false) => {
     TestBed.configureTestingModule({
       imports: [BookingsPage],
       providers: [
@@ -44,6 +49,7 @@ describe('Customer payments', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
+              data: { business },
               paramMap: convertToParamMap(id ? { id } : {}),
               queryParamMap: convertToParamMap({ checkout: arrival }),
             },
@@ -79,7 +85,7 @@ describe('Customer payments', () => {
     },
   );
 
-  it.each(['get', 'refresh', 'checkout'] as const)(
+  it.each(['get', 'refresh', 'checkout', 'cancel', 'abandon'] as const)(
     'rejects invalid IDs at the %s API boundary',
     (method) => {
       setup();
@@ -188,6 +194,151 @@ describe('Customer payments', () => {
       fixture.nativeElement.querySelector(
         'a[href="/bookings/b1522ac5-4adc-44ba-83d9-251906719fe0"]',
       ),
+    ).not.toBeNull();
+  });
+
+  it('shows the no-refund policy and requires explicit cancellation confirmation', async () => {
+    setup();
+    http
+      .expectOne('/api/bookings/' + pending.id)
+      .flush({ ...pending, status: 'Confirmed', canCancel: true });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain(
+      'maksettua hintaa ei palauteta automaattisesti',
+    );
+    fixture.componentInstance.cancel();
+    http.expectNone('/api/account/csrf');
+    fixture.componentInstance.askCancel();
+    fixture.componentInstance.cancel();
+    fixture.componentInstance.cancel();
+    http.expectOne('/api/account/csrf').flush(null);
+    const request = http.expectOne('/api/bookings/' + pending.id + '/cancel');
+    expect(request.request.body).toEqual({});
+    request.flush({
+      ...pending,
+      status: 'Cancelled',
+      confirmedAt: '2027-01-18T09:00:00Z',
+      cancellation: {
+        actor: 'Customer',
+        cancelledAt: '2027-01-18T09:05:00Z',
+        refundAmountCents: 0,
+      },
+    });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('Asiakas perui varauksen.');
+    expect(fixture.nativeElement.textContent).not.toContain('Maksun palautus on vahvistettu');
+  });
+  it('displays the legacy refund policy before payment', async () => {
+    setup();
+    http
+      .expectOne('/api/bookings/' + pending.id)
+      .flush({ ...pending, cancellationPolicy: 'LegacyFullRefundBeforeStart' });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('aiempi ehto');
+    expect(fixture.nativeElement.textContent).toContain('palautetaan kokonaan palvelumaksuineen');
+  });
+  it('routes business cancellation correctly and discloses the full refund', async () => {
+    setup(pending.id, '', true);
+    http
+      .expectOne('/api/business/bookings/' + pending.id)
+      .flush({ ...pending, status: 'Confirmed', canCancel: true });
+    fixture.componentInstance.askCancel();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('Aika poistuu myynnistä');
+    fixture.componentInstance.pay();
+    http.expectNone('/api/account/csrf');
+    fixture.componentInstance.cancel();
+    http.expectOne('/api/account/csrf').flush(null);
+    http.expectOne('/api/business/bookings/' + pending.id + '/cancel').flush({
+      ...pending,
+      status: 'Cancelled',
+      refund: { status: 'Queued', amountCents: 4500 },
+      cancellation: {
+        actor: 'Business',
+        cancelledAt: '2027-01-18T09:05:00Z',
+        refundAmountCents: 4500,
+      },
+    });
+    await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('Yritys perui ajan.');
+    expect(fixture.nativeElement.textContent).toContain('palautus on jonossa');
+    expect(fixture.nativeElement.textContent).not.toContain('palautus on vahvistettu');
+  });
+  it.each(['Queued', 'Pending', 'Succeeded', 'Failed', 'RecoveryRequired'] as const)(
+    'separates cancellation from the %s refund state',
+    async (status) => {
+      setup();
+      http.expectOne('/api/bookings/' + pending.id).flush({
+        ...pending,
+        status: 'Cancelled',
+        refund: { status, amountCents: 4500 },
+        cancellation: {
+          actor: 'Business',
+          cancelledAt: '2027-01-18T09:05:00Z',
+          refundAmountCents: 4500,
+        },
+      });
+      await fixture.whenStable();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Yritys perui ajan.');
+      expect(text.includes('Maksun palautus on vahvistettu')).toBe(status === 'Succeeded');
+      if (status === 'Failed' || status === 'RecoveryRequired')
+        expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+      fixture.componentInstance.askCancel();
+      expect(fixture.componentInstance.confirming()).toBe(false);
+    },
+  );
+  it('preserves the confirmed booking when cancellation fails', async () => {
+    setup();
+    http
+      .expectOne('/api/bookings/' + pending.id)
+      .flush({ ...pending, status: 'Confirmed', canCancel: true });
+    fixture.componentInstance.askCancel();
+    fixture.componentInstance.cancel();
+    http.expectOne('/api/account/csrf').flush(null);
+    http
+      .expectOne('/api/bookings/' + pending.id + '/cancel')
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    await fixture.whenStable();
+    expect(fixture.componentInstance.booking()?.status).toBe('Confirmed');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+  });
+  it('requires another confirmation when payment wins abandonment', async () => {
+    setup();
+    http.expectOne('/api/bookings/' + pending.id).flush(pending);
+    fixture.componentInstance.askCancel();
+    fixture.componentInstance.cancel();
+    http.expectOne('/api/account/csrf').flush(null);
+    http.expectOne('/api/bookings/' + pending.id + '/abandon').flush({
+      ...pending,
+      status: 'Confirmed',
+      canCancel: true,
+      cancellationRequested: true,
+    });
+    await fixture.whenStable();
+    expect(fixture.componentInstance.confirming()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Maksu ehti vahvistua ennen keskeytystä');
+    http.expectNone('/api/bookings/' + pending.id + '/cancel');
+  });
+  it('disables payment while abandonment is unresolved', async () => {
+    setup();
+    http
+      .expectOne('/api/bookings/' + pending.id)
+      .flush({ ...pending, cancellationRequested: true });
+    await fixture.whenStable();
+    fixture.componentInstance.pay();
+    http.expectNone('/api/account/csrf');
+    expect(fixture.nativeElement.textContent).toContain('Keskeytystä käsitellään');
+    expect(fixture.nativeElement.querySelector('.primary-button')).toBeNull();
+  });
+  it('links business list entries to the owned booking view', async () => {
+    setup(null, '', true);
+    http
+      .expectOne('/api/business/bookings?page=1')
+      .flush({ items: [pending], total: 1, page: 1, pageSize: 20 });
+    await fixture.whenStable();
+    expect(
+      fixture.nativeElement.querySelector('a[href="/business/bookings/' + pending.id + '"]'),
     ).not.toBeNull();
   });
 });

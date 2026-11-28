@@ -24,7 +24,7 @@ Include account registration, verification, recovery, nearby search, service/dat
 - With destination charges, payment-provider costs come out of the platform's proceeds.
 - New bookings: customer cancellation before the start releases the slot without an automatic refund after payment. Business cancellation creates a full refund including the platform fee. Existing bookings retain their original full-refund-before-start policy; see decisions/005-cancellations-and-refunds.md.
 - Reservations last 35 minutes; start Checkout within four minutes, for appointments more than 40 minutes away. Never release a hold based solely on a local timer while payment remains possible.
-- Only card payments are enabled. Cancellation lifecycle and durable refund obligations are implemented; the dependent provider and UI slices add processing and screens.
+- Only card payments are enabled. Customer/business cancellation, safe unpaid abandonment, separate refund status and Stripe refund reconciliation are implemented. A real sandbox business cancellation and full refund passed on 2026-11-28.
 
 These are demo policies, not finalized terms for a real-money pilot.
 
@@ -44,7 +44,7 @@ These are demo policies, not finalized terms for a real-money pilot.
 1. **Runnable foundation:** Angular calls ASP.NET Core and SQL Server; migration, clearly marked demo openings, CI, original branding.
 2. **Business publishing:** accounts, business ownership/profile, publish/manage demo slots. Stripe sandbox onboarding is implemented separately; a real hosted round trip with fictional test data reached ready on 2026-11-27.
 3. **Discovery and paid booking:** Stripe sandbox onboarding, location/service/date search, reservation, Checkout, verified payment confirmation, double-booking protection.
-4. **Cancellation and recovery:** refunds, abandoned-checkout cleanup, retry-safe webhook processing, dashboards, notification delivery.
+4. **Cancellation and recovery:** cancellation/refunds, abandoned-checkout cleanup, retry-safe webhook processing and customer/business booking views are implemented. Notification delivery and an operator recovery UI remain planned.
 5. **Azure demo:** Bicep, OIDC deployment, controlled migrations, monitoring, costs, end-to-end smoke tests.
 6. **Real pilot:** live onboarding, agreed commercial/cancellation policies, operational recovery and real email delivery.
 

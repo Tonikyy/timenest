@@ -2,22 +2,31 @@
   <a routerLink="/" aria-label="TimeNest - etusivu"
     ><img src="images/logo.svg" alt="TimeNest" width="166" height="70"
   /></a>
-  <nav class="workspace-nav" aria-label="Asiakkaan valikko">
-    <a routerLink="/">Löydä aika</a><a routerLink="/bookings">Omat varaukset</a
-    ><a routerLink="/account">Oma tili</a>
+  <nav class="workspace-nav" aria-label="Varausten valikko">
+    @if (business) {
+      <a routerLink="/business">Yritysprofiili</a><a routerLink="/business/vacancies">Omat ajat</a>
+    } @else {
+      <a routerLink="/">Löydä aika</a>
+    }
+    <a [routerLink]="bookingPath">{{ business ? 'Asiakasvaraukset' : 'Omat varaukset' }}</a>
+    <a routerLink="/account">Oma tili</a>
   </nav>
-  <h1>{{ id ? 'Oma hetkesi' : 'Omat varaukset' }}</h1>
+  <h1>
+    {{
+      business ? (id ? 'Asiakasvaraus' : 'Asiakasvaraukset') : id ? 'Oma hetkesi' : 'Omat varaukset'
+    }}
+  </h1>
   <p class="form-success">
-    Esittelytila · Vain kuvitteellisia palveluja ja testimaksuja. Oikeaa rahaa ei liiku.
+    Esittelytila – Vain kuvitteellisia palveluja ja testimaksuja. Oikeaa rahaa ei liiku.
   </p>
-  @if (arrival === 'return' || arrival === 'cancel') {
+  @if (!business && (arrival === 'return' || arrival === 'cancel')) {
     <p>
       Palasit maksusivulta. Varaus vahvistuu vasta, kun maksu on tarkistettu. Paluu ei peruuta
       maksua.
     </p>
   }
   @if (busy()) {
-    <p role="status">Tarkistetaan varausta…</p>
+    <p role="status">Tarkistetaan varausta.</p>
   }
   @if (error()) {
     <p class="form-error" role="alert">{{ error() }}</p>
@@ -36,9 +45,63 @@
         {{ price(item.feeCents) }} palvelumaksun.
       </p>
       <h3 aria-live="polite">{{ label(item.status) }}</h3>
-      @if (item.status === 'Confirmed') {
-        <p class="form-success">Maksu on vahvistettu ja aika on varattu sinulle.</p>
-        <p>Esittelyversion peruutukset ja palautukset tulevat myöhemmin.</p>
+      @if (item.status === 'Cancelled') {
+        <p>
+          {{
+            item.cancellation?.actor === 'Business'
+              ? 'Yritys perui ajan.'
+              : 'Asiakas perui varauksen.'
+          }}
+        </p>
+        @if (item.refund; as refund) {
+          <p>
+            Palautuksen määrä: <strong>{{ price(refund.amountCents) }}</strong>, sisältäen
+            palvelumaksun.
+          </p>
+          @switch (refund.status) {
+            @case ('Queued') {
+              <p role="status">Maksun palautus on jonossa. Sitä ei ole vielä vahvistettu.</p>
+            }
+            @case ('Pending') {
+              <p role="status">Maksun palautus on käsittelyssä. Sitä ei ole vielä vahvistettu.</p>
+            }
+            @case ('Succeeded') {
+              <p class="form-success">
+                Maksun palautus on vahvistettu. Näkyminen tilillä voi kestää useita pankkipäiviä.
+              </p>
+            }
+            @case ('Failed') {
+              <p class="form-error" role="alert">
+                Maksun palautus epäonnistui. Ota yhteyttä TimeNestin ylläpitoon. Varaus on silti
+                peruttu.
+              </p>
+            }
+            @case ('RecoveryRequired') {
+              <p class="form-error" role="alert">
+                Maksun palautus vaatii selvityksen. Ota yhteyttä TimeNestin ylläpitoon. Varaus on
+                silti peruttu.
+              </p>
+            }
+          }
+        } @else if (item.confirmedAt) {
+          <p>Maksettua hintaa ei palauteta automaattisesti tämän varauksen peruutusehdon mukaan.</p>
+        } @else {
+          <p>Maksua ei vahvistettu. Varauksen pito on vapautettu.</p>
+        }
+      } @else if (item.status === 'Confirmed') {
+        <p class="form-success">
+          {{
+            business
+              ? 'Asiakkaan maksu on vahvistettu.'
+              : 'Maksu on vahvistettu ja aika on varattu sinulle.'
+          }}
+        </p>
+        @if (item.cancellationRequested && !business) {
+          <p>
+            Maksu ehti vahvistua ennen keskeytystä. Varaus on voimassa. Jos haluat perua sen,
+            vahvista peruutus erikseen alla olevien ehtojen mukaan.
+          </p>
+        }
       } @else if (item.status === 'Expired') {
         <p>Maksua ei vahvistettu ja varaus on päättynyt. Voit etsiä uuden vapaan ajan.</p>
         <a routerLink="/">Etsi uusi aika</a>
@@ -47,7 +110,12 @@
           Maksun tilanne tarvitsee selvityksen. Ota yhteyttä TimeNestin ylläpitoon ennen uutta
           varausta.
         </p>
-      } @else {
+      } @else if (item.cancellationRequested) {
+        <p role="status">
+          Keskeytystä käsitellään. Aikaa ei vapauteta ennen kuin maksun tilanne on varmistettu.
+          Tarkista tila hetken kuluttua.
+        </p>
+      } @else if (!business) {
         <p>
           Aloita maksu viimeistään {{ day(item.checkoutStartBefore) }} klo
           {{ time(item.checkoutStartBefore) }}. Maksuaika päättyy {{ day(item.holdExpiresAt) }} klo
@@ -57,8 +125,75 @@
           Jos olet jo maksanut, tarkista tila. Keskeneräistä maksua ei tulkita automaattisesti
           peruutukseksi.
         </p>
+      }
+      @if (item.status === 'Pending' || item.status === 'Confirmed') {
+        <section aria-labelledby="cancellation-policy">
+          <h3 id="cancellation-policy">Peruutusehto</h3>
+          @if (item.cancellationPolicy === 'LastMinuteNoRefund') {
+            <p>
+              Tämä on viime hetken aika. Asiakas voi perua ennen ajan alkua, mutta maksettua hintaa
+              ei palauteta automaattisesti.
+            </p>
+          } @else {
+            <p>
+              Tässä varauksessa on aiempi ehto: asiakkaan peruutus ennen ajan alkua palautetaan
+              kokonaan palvelumaksuineen.
+            </p>
+          }
+          <p>Jos yritys peruu ajan, asiakkaalle palautetaan koko maksu palvelumaksuineen.</p>
+        </section>
+      }
+      @if (
+        !business &&
+        item.status === 'Pending' &&
+        !item.recoveryRequired &&
+        !item.cancellationRequested
+      ) {
         <button class="primary-button" type="button" (click)="pay()" [disabled]="busy()">
           Jatka maksamaan
+        </button>
+      }
+      @if (confirming()) {
+        <section class="managed-slot" aria-labelledby="confirm-cancellation">
+          <h3 id="confirm-cancellation">
+            {{ item.status === 'Pending' ? 'Keskeytetäänkö varaus?' : 'Perutaanko varaus?' }}
+          </h3>
+          @if (item.status === 'Pending') {
+            <p>
+              Vapautamme ajan vasta, kun maksaminen ei enää ole mahdollista. Jos maksu ehtii
+              vahvistua, varaus pysyy voimassa ja peruutus täytyy vahvistaa erikseen.
+            </p>
+          } @else if (business || item.cancellationPolicy === 'LegacyFullRefundBeforeStart') {
+            <p>
+              Peruutus käynnistää koko {{ price(item.priceCents) }} maksun palautuksen
+              palvelumaksuineen.
+              {{ business ? 'Aika poistuu myynnistä.' : 'Aika vapautuu uudelleen myyntiin.' }}
+            </p>
+          } @else {
+            <p>
+              Peruutus vapauttaa ajan uudelleen myyntiin. Maksamaasi
+              {{ price(item.priceCents) }} hintaa ei palauteta automaattisesti.
+            </p>
+          }
+          <div class="workspace-nav">
+            <button
+              class="secondary-button"
+              type="button"
+              (click)="confirming.set(false)"
+              [disabled]="busy()"
+            >
+              Pidä varaus
+            </button>
+            <button class="secondary-button" type="button" (click)="cancel()" [disabled]="busy()">
+              Vahvista peruutus
+            </button>
+          </div>
+        </section>
+      } @else if (
+        item.canCancel || (!business && item.status === 'Pending' && !item.cancellationRequested)
+      ) {
+        <button class="secondary-button" type="button" (click)="askCancel()" [disabled]="busy()">
+          {{ item.status === 'Pending' ? 'Keskeytä varaus' : 'Peru varaus' }}
         </button>
       }
     </article>
@@ -67,14 +202,25 @@
     @for (item of page.items; track item.id) {
       <article class="managed-slot">
         <h2>
-          <a [routerLink]="['/bookings', item.id]">{{ item.title }}</a>
+          <a [routerLink]="[bookingPath, item.id]">{{ item.title }}</a>
         </h2>
         <p>{{ item.businessName }} · {{ day(item.startsAt) }} klo {{ time(item.startsAt) }}</p>
         <p>{{ price(item.priceCents) }} · {{ label(item.status) }}</p>
+        @if (item.refund) {
+          <p>Maksun palautuksen tila näkyy varauksen tiedoissa.</p>
+        }
       </article>
     } @empty {
-      <p>Sinulla ei ole vielä varauksia.</p>
-      <a routerLink="/">Löydä oma hetkesi</a>
+      <p>
+        {{
+          business
+            ? 'Yrityksellä ei ole vielä asiakasvarauksia.'
+            : 'Sinulla ei ole vielä varauksia.'
+        }}
+      </p>
+      @if (!business) {
+        <a routerLink="/">Löydä oma hetkesi</a>
+      }
     }
     @if (page.total > page.pageSize) {
       <nav class="workspace-nav" aria-label="Varausten sivut">

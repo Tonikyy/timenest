@@ -148,7 +148,7 @@ A missing session ID after a recorded attempt is an uncertain provider outcome, 
 
 Pause work for that booking. In the same sandbox, inspect its idempotency key and timenest_booking_id metadata, verify the session and all snapshotted payment details, and associate only that verified session with the existing payment row in a transaction. Require exactly one updated row and preserve the unique session/payment-intent indexes. Set status back to Creating so reconciliation retrieves the association. Never delete payment history or create a replacement session for an uncertain attempt. A delayed signed webhook can also recover an unassociated session using its verified provider metadata and snapshot checks.
 
-A reservation with no recorded provider attempt can be released after expiry. Once an attempt exists, only verified expired/unpaid sessions release slots; open, processing, unreachable or mismatched sessions retain the hold. Pressing Back or returning from Checkout does not cancel a payment or free a slot. Confirmed-booking cancellation and refunds are not implemented in this slice.
+A reservation with no recorded provider attempt can be released after expiry. Once an attempt exists, only verified expired/unpaid sessions release slots; open, processing, unreachable or mismatched sessions retain the hold. Pressing Back or returning from Checkout does not cancel a payment or free a slot. The cancellation and refund additions are described below.
 
 ### Customer payment verification (2026-11-27)
 
@@ -166,3 +166,9 @@ Queued means the obligation is recorded; Pending means Stripe has not completed 
 The create request uses one persisted attempt and stable key. An unknown attempt older than 23 hours is never blindly recreated. Inspect the sandbox payment and its refunds in Stripe: compare the exact PaymentIntent, booking metadata, EUR amount and transfer/fee reversal. If the existing refund is found, resend its signed refund.created or refund.updated event to recover the association. Never clear the attempt or invent a new key to bypass ambiguity. Failed refunds and manual replacements require an explicit recovery decision preserving the old history; this demo does not provide an operator retry UI or automated replacement refund. Keep unresolved obligations visible.
 
 Stripe can hold card refunds pending when the available balance is insufficient; cancellation must not label these completed. For local failure and race coverage, run dotnet test against the SQL Server test container. No live payments are enabled.
+
+### Verified sandbox cancellation and refund
+
+On 2026-11-28, the migration preserved the original full-refund-before-start policy on the previously paid EUR 45 sandbox booking. In the real browser, its fictional business owner opened the owned booking, reviewed the full-refund confirmation, and cancelled it. The UI first displayed a queued refund. The actual hosted background worker then submitted the Stripe sandbox refund with destination-transfer reversal and application-fee refund; the UI subsequently displayed a verified successful EUR 45 refund, including the EUR 5 fee. Desktop and 390-CSS-pixel mobile layouts were inspected. No real money moved.
+
+The new no-automatic-refund customer policy, unpaid cancellation/payment races, provider failures, duplicate callbacks and refund-state failures are covered by automated SQL Server/SDK and Angular tests. Real Stripe webhook forwarding, actual bank settlement and real-provider delayed failures remain unverified; the actual sandbox run exercised worker-driven recovery without a browser return.
