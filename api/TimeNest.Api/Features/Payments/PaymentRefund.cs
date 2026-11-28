@@ -10,6 +10,7 @@ public sealed class PaymentRefund
     public string Currency { get; set; } = "eur";
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? AttemptedAt { get; set; }
+    public DateTimeOffset? SucceededAt { get; set; }
     public DateTimeOffset? LastCheckedAt { get; set; }
     public string? StripeRefundId { get; set; }
     public RefundStatus Status { get; set; }

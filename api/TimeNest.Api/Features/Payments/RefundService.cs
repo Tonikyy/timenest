@@ -64,6 +64,7 @@ public sealed class RefundService(TimeNestDbContext database, IStripeRefundGatew
             (payment.Status == RefundStatus.Succeeded && status != RefundStatus.Failed)) return;
         payment.StripeRefundId = refund.Id;
         payment.Status = status;
+        if (status == RefundStatus.Succeeded) payment.SucceededAt ??= clock.GetUtcNow();
         await database.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
     }
